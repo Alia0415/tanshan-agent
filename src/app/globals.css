@@ -1931,7 +1931,7 @@ summary {
 .mode-badge { background: #f6f8fa; border: 0; color: #64748b; font-size: 12px; }
 .mode-badge > span { background: #056de8; }
 .avatar { border-radius: 4px; width: 32px; height: 32px; background: #e8f1ff; color: #056de8; border: 0; }
-.sidebar { position: absolute; left: calc(50% + 260px); top: 84px; bottom: auto; width: 280px; padding: 22px; background: #fff; border: 0; border-radius: 3px; box-shadow: 0 1px 3px #12121214; }
+.sidebar { position: absolute; left: calc(50% - 540px); top: 84px; bottom: auto; width: 280px; padding: 22px; background: #fff; border: 0; border-radius: 3px; box-shadow: 0 1px 3px #12121214; }
 .brand { margin: 0 0 22px; gap: 10px; }
 .brand-icon { border-radius: 5px; background: #056de8; color: #fff; width: 36px; height: 36px; }
 .brand > span:last-child { color: #121212; font-size: 19px; letter-spacing: 1px; }
@@ -1947,7 +1947,7 @@ summary {
 .sidebar-story em { color: #056de8; font-weight: 600; }
 .sidebar-story > svg, .story-line { display: none; }
 .privacy { color: #8590a6; font-size: 10px; }
-.home, .conversation { width: 780px; padding: 12px 20px 32px 0; margin: 0 auto; transform: translateX(-150px); }
+.home, .conversation { width: 780px; padding: 12px 0 32px 20px; margin: 0 auto; transform: translateX(150px); }
 .hero { padding: 26px 24px 20px; min-height: 0; margin: 0; background: #fff; border-radius: 3px 3px 0 0; }
 .hero-kicker { color: #056de8; font-size: 12px; letter-spacing: 0; margin-bottom: 14px; }
 .hero-kicker > span { background: #056de8; }
@@ -1986,8 +1986,8 @@ summary {
 .post-open, .ai-summary > summary { color: #056de8; }
 .mobile-brand { display: none !important; }
 @media (max-width: 1120px) {
-  .sidebar { left: auto; right: 20px; width: 260px; }
-  .home, .conversation { width: calc(100% - 320px); margin: 0 0 0 20px; padding-right: 0; transform: none; }
+  .sidebar { left: 20px; right: auto; width: 260px; }
+  .home, .conversation { width: calc(100% - 320px); margin: 0 20px 0 auto; padding-left: 0; transform: none; }
   .page-footer { padding: 22px 20px; }
 }
 @media (max-width: 800px) {
