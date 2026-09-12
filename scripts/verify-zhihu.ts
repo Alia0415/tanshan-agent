@@ -6,7 +6,7 @@ import { ZhihuProvider, deduplicate } from "../src/lib/server/providers";
 import { AppError } from "../src/lib/domain/validation";
 import type { Session } from "../src/lib/domain/types";
 
-// Explicit live check: two searches and one generation. Never run automatically in CI.
+// Explicit live check: one Zhihu search and one generation. Never run automatically in CI.
 // Only status/counts are logged; secrets and response bodies are not printed.
 async function main() {
   const envFile = resolve(import.meta.dirname, "../.env.local");
@@ -21,7 +21,7 @@ async function main() {
   const provider = new ZhihuProvider();
   const query = "远程办公有哪些实际体验？";
   const started = Date.now();
-  const zhihu = await provider.search(query, "zhihu");
+  const zhihu = await provider.search(query);
   console.log(
     JSON.stringify({
       capability: "zhihu_search",
@@ -29,19 +29,11 @@ async function main() {
       sources: zhihu.length,
     }),
   );
-  const global = await provider.search("远程办公 官方指南", "global");
-  console.log(
-    JSON.stringify({
-      capability: "global_search",
-      ok: true,
-      sources: global.length,
-    }),
-  );
-  const sources = deduplicate([...zhihu, ...global]).slice(0, 6);
+  const sources = deduplicate(zhihu).slice(0, 6);
   if (!sources.length) {
     throw new AppError(
       "NO_EVIDENCE",
-      "两个搜索接口均未返回可用来源，未调用直答；请先检查搜索权限与结果。",
+      "知乎搜索未返回可用帖子，未调用直答；请先检查搜索权限与结果。",
       502,
     );
   }
@@ -94,7 +86,7 @@ async function main() {
     );
   }
   console.log(
-    "知乎搜索、全网搜索和直答接口验证通过。普通直答文本与带来源编号的结构化回答分别展示。",
+    "知乎帖子搜索和直答接口验证通过。普通直答文本与带来源编号的结构化回答分别展示。",
   );
 }
 

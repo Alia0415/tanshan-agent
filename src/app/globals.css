@@ -1858,3 +1858,61 @@ summary {
     opacity: 0.65;
   }
 }
+
+/* The retrieved posts are the primary result; synthesis is secondary. */
+.post-results {
+  margin-top: 20px;
+}
+.posts-heading {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  color: #405f49;
+}
+.posts-heading > span {
+  font-size: 12px;
+  font-weight: 500;
+  background: #edf2e6;
+  padding: 3px 7px;
+  margin-left: 6px;
+  border-radius: 5px;
+}
+.posts-hint {
+  color: #73836c;
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 8px 0 16px;
+}
+.post-results .source-card {
+  flex-wrap: wrap;
+}
+.post-results .source-card strong {
+  font-size: 15px;
+}
+.post-results .source-card p {
+  font-size: 11px;
+}
+.post-results .source-card small {
+  font-size: 12px;
+  color: #687861;
+  white-space: pre-line;
+}
+.post-open {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-basis: 100%;
+  margin-left: 32px;
+  color: #486b45;
+  font-size: 12px;
+}
+.ai-summary {
+  margin-top: 25px;
+  border-top: 1px solid #e7eddf;
+  padding-top: 18px;
+}
+.ai-summary > summary {
+  cursor: pointer;
+  color: #627c52;
+  font-size: 14px;
+}

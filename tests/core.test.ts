@@ -33,6 +33,7 @@ import {
   type KnowledgeProvider,
 } from "../src/lib/server/providers";
 import type { Source } from "../src/lib/domain/types";
+import { isZhihuPostUrl } from "../src/lib/domain/sources";
 
 process.env.WENSHAN_DB_PATH = join(
   mkdtempSync(join(tmpdir(), "wenshan-test-")),
@@ -427,59 +428,130 @@ test("provider recognizes business errors even when Data is null", async () => {
   }
 });
 
-test("external evidence is requested separately and within the three-call budget", async () => {
+test("price questions keep the two-query plan and at most one empty-result retry", async () => {
   const session = start("预算有限，想了解相机的价格和长期使用体验");
   const request = randomUUID();
   const calls: string[] = [];
   claimAnswer(session.session_id, owner, 1, request);
   await runAnswer(session.session_id, 1, request, {
-    search: async (_, channel) => {
-      calls.push(channel || "zhihu");
+    search: async (query) => {
+      calls.push(query);
       return [];
     },
     generate: async () => {
       throw new Error("no evidence");
     },
   });
-  assert.deepEqual(calls, ["zhihu", "zhihu", "global"]);
+  assert.equal(calls.length, 3);
+  assert.deepEqual(calls.slice(0, 2), buildQueries(session));
+  assert.equal(calls[2], session.original_question);
   assert.equal(
     getSession(session.session_id, owner).answers[0].evidence,
     "insufficient",
   );
 });
 
-test("the provider maps global search to the documented endpoint and labels its evidence", async () => {
+test("the provider only searches Zhihu and filters non-post results while preserving original URLs", async () => {
   const previousFetch = globalThis.fetch;
   process.env.ZHIHU_ACCESS_SECRET = "test-only-placeholder";
   try {
     globalThis.fetch = async (input) => {
       assert.equal(
         new URL(String(input)).pathname,
-        "/api/v1/content/global_search",
+        "/api/v1/content/zhihu_search",
       );
       return Response.json({
         Code: 0,
         Data: {
           Items: [
-            {
-              Title: "官方说明",
-              ContentType: "Article",
-              ContentID: "1",
-              ContentText: "测试资料",
-              Url: "https://example.com/official",
-              AuthorName: "测试机构",
-            },
-          ],
+            ["Article", "https://zhuanlan.zhihu.com/p/123?utm_source=test"],
+            ["answer", source.url],
+            ["Question", "https://www.zhihu.com/question/456"],
+            ["Article", "https://example.com/official"],
+            [
+              "Article",
+              "https://link.zhihu.com/?target=https%3A%2F%2Fexample.com",
+            ],
+            ["Answer", "https://www.zhihu.com/people/example"],
+            ["Profile", source.url],
+          ].map(([ContentType, Url], index) => ({
+            Title: "测试帖子",
+            ContentType,
+            ContentID: String(index),
+            ContentText: "测试摘要",
+            Url,
+            AuthorName: "测试作者",
+          })),
         },
       });
     };
-    const result = await new ZhihuProvider().search("政策", "global");
-    assert.equal(result[0].channel, "global");
-    assert.equal(result[0].url, "https://example.com/official");
+    const result = await new ZhihuProvider().search("政策");
+    assert.equal(result.length, 3);
+    assert.ok(result.every((item) => item.channel === "zhihu"));
+    assert.equal(
+      result[0].url,
+      "https://zhuanlan.zhihu.com/p/123?utm_source=test",
+    );
+    assert.equal(result[1].url, source.url);
   } finally {
     globalThis.fetch = previousFetch;
     delete process.env.ZHIHU_ACCESS_SECRET;
   }
+});
+
+test("post URLs reject redirects, look-alike domains, credentials, and non-post pages", () => {
+  for (const url of [
+    "https://zhihu.com/question/12/",
+    source.url,
+    "https://www.zhihu.com/answer/123",
+    "https://zhuanlan.zhihu.com/p/123?utm_source=original#section",
+  ])
+    assert.equal(isZhihuPostUrl(url), true, url);
+  for (const url of [
+    "javascript:alert(1)",
+    "https://zhihu.com.evil.test/question/1",
+    "https://www.zhihu.com@evil.test/question/1",
+    "https://evil@www.zhihu.com/question/1",
+    "https://link.zhihu.com/?target=https://www.zhihu.com/question/1",
+    "https://www.zhihu.com/people/example",
+    "https://www.zhihu.com/search?q=example",
+    "https://developer.zhihu.com/question/1",
+    "https://www.zhihu.com/question/1/redirect",
+    "https://www.zhihu.com:8080/question/1",
+  ])
+    assert.equal(isZhihuPostUrl(url), false, url);
+});
+
+test("runtime filters injected external sources before generation and text output lists posts first", async () => {
+  const { presentAgentReply } = await import("../src/lib/agent/bridge");
+  const session = start();
+  const request = randomUUID();
+  claimAnswer(session.session_id, owner, 1, request);
+  await runAnswer(session.session_id, 1, request, {
+    search: async () => [
+      { ...source, content_id: "external", url: "https://example.com/post" },
+      source,
+      { ...source, content_id: "old-global", channel: "global" },
+    ],
+    generate: async (_, sources) => {
+      assert.deepEqual(sources, [source]);
+      return draft;
+    },
+  });
+  const result = getSession(session.session_id, owner);
+  assert.deepEqual(result.answers[0].sources, [source]);
+  const reply = presentAgentReply(result);
+  assert.match(reply.text, /测试摘要/);
+  assert.ok(reply.text.indexOf(source.url) < reply.text.indexOf("AI 辅助总结"));
+  result.answers[0].sources.push({
+    ...source,
+    id: 2,
+    channel: "global",
+    url: "https://example.com/post",
+  });
+  const legacy = presentAgentReply(result);
+  assert.doesNotMatch(legacy.text, /example\.com|测试结论/);
+  assert.match(legacy.text, /旧总结已隐藏/);
 });
 
 test("text-only agent conversation supports clarification, answer, revision, and identity isolation", async () => {

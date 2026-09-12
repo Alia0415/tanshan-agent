@@ -110,9 +110,3 @@ export function buildQueries(session: Session): string[] {
         .map((priority) => `${base} ${priority}`.slice(0, 2000))
     : [base.slice(0, 2000)];
 }
-
-export function needsExternalEvidence(session: Session): boolean {
-  return /最新|今天|今年|目前|政策|法规|法律|官方|价格|购买|预算|投资|股票|基金|贷款|药物|用药|症状|诊断|治疗/.test(
-    session.focused_question,
-  );
-}

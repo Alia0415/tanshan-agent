@@ -51,4 +51,6 @@ POST /api/agent/messages 接收 message（1–2000 字符）、request_id（UUID
 
 ## 回答形式
 
+answer.sources 只包含知乎问题、回答和专栏文章，URL 为知乎原帖地址。title、author、excerpt 来自知乎搜索，其中 excerpt 是搜索摘要，不是帖子全文。卡片和 text 结果先展示帖子列表；卡片的 AI 辅助总结默认折叠。旧会话数据不改写，展示时过滤历史站外资料，并隐藏依赖这些资料的旧总结。
+
 answer.format 可为 structured（引用编号已校验）、zhida_text（知乎直答普通文本，无逐条引用）或 source_excerpts（检索原始摘要）。普通文本的 evidence 为 unverified，相关检索资料不能当作正文证据。ZHIHU_GENERATION_MODE=sources 可在额度不足时完全跳过生成调用。

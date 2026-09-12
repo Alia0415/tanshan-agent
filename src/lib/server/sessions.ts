@@ -9,12 +9,12 @@ import {
 } from "../domain/validation";
 import {
   buildQueries,
-  needsExternalEvidence,
   extractContext,
   focusQuestion,
   mergeContext,
   nextCard,
 } from "../domain/clarification";
+import { filterZhihuPosts } from "../domain/sources";
 import {
   checkVersion,
   db,
@@ -243,16 +243,10 @@ export async function runAnswer(
     let successfulSearches = 0;
     if (session.provider === "live") {
       let lastError: unknown;
-      const searchPlan = queries.map((query) => ({
-        query,
-        channel: "zhihu" as "zhihu" | "global",
-      }));
-      if (needsExternalEvidence(session))
-        searchPlan.push({ query: queries[0], channel: "global" });
-      for (const { query, channel } of searchPlan) {
+      for (const query of queries) {
         if (!isCurrent()) return;
         try {
-          sources.push(...(await provider.search(query, channel)));
+          sources.push(...filterZhihuPosts(await provider.search(query)));
           successfulSearches += 1;
         } catch (error) {
           if (
@@ -272,7 +266,7 @@ export async function runAnswer(
           new AppError("SEARCH_FAILED", "本次未能完成搜索，请稍后重试。", 502)
         );
       // One simplified retry, only for genuinely empty results; total query budget <= 3.
-      if (!sources.length && searchPlan.length < 3) {
+      if (!sources.length && queries.length < 3) {
         const simplified =
           session.confirmed_context.topic ||
           session.original_question.slice(0, 80);
@@ -280,7 +274,9 @@ export async function runAnswer(
           queries.push(simplified);
           if (!isCurrent()) return;
           try {
-            sources.push(...(await provider.search(simplified)));
+            sources.push(
+              ...filterZhihuPosts(await provider.search(simplified)),
+            );
           } catch (error) {
             if (
               error instanceof AppError &&

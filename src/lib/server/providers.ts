@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ANSWER_INSTRUCTIONS } from "../agent/definition";
 import type { Answer, AnswerSection, Session, Source } from "../domain/types";
 import { AppError } from "../domain/validation";
+import { isZhihuPostUrl } from "../domain/sources";
 
 export interface Draft {
   format?: Answer["format"];
@@ -11,7 +12,7 @@ export interface Draft {
   limitations: string[];
 }
 export interface KnowledgeProvider {
-  search(query: string, channel?: "zhihu" | "global"): Promise<Source[]>;
+  search(query: string): Promise<Source[]>;
   generate(session: Session, sources: Source[]): Promise<Draft>;
 }
 
@@ -237,12 +238,11 @@ export function parseTextDraft(content: string): Draft | undefined {
   if (!body) return;
   return {
     format: "zhida_text",
-    summary:
-      "以下是知乎直答的综合回答。相关检索资料单独列在下方，供你进一步核对。",
+    summary: "以下是知乎直答的综合回答，可结合帖子列表进一步核对。",
     summary_citations: [],
     sections: [{ title: "知乎直答", body, citations: [] }],
     limitations: [
-      "这段直答没有提供可逐条核对的引用；下方检索资料不能视为正文每项结论的证据。",
+      "这段直答没有提供可逐条核对的引用；检索帖子不能视为正文每项结论的证据。",
       ...(trimmed.length > 20000
         ? ["回答较长，此处仅展示前 20,000 字符。"]
         : []),
@@ -251,12 +251,9 @@ export function parseTextDraft(content: string): Draft | undefined {
 }
 
 export class ZhihuProvider implements KnowledgeProvider {
-  async search(
-    query: string,
-    channel: "zhihu" | "global" = "zhihu",
-  ): Promise<Source[]> {
+  async search(query: string): Promise<Source[]> {
     const url = new URL(
-      `https://developer.zhihu.com/api/v1/content/${channel === "global" ? "global_search" : "zhihu_search"}`,
+      "https://developer.zhihu.com/api/v1/content/zhihu_search",
     );
     url.searchParams.set("Query", query);
     url.searchParams.set("Count", "5");
@@ -276,23 +273,27 @@ export class ZhihuProvider implements KnowledgeProvider {
     const searchData = searchDataSchema.safeParse(result.data.Data);
     if (!searchData.success)
       throw new AppError("INVALID_RESPONSE", "搜索结果缺少资料字段。", 502);
-    return searchData.data.Items.filter((item) => safeUrl(item.Url)).map(
-      (item, index) => ({
-        id: index + 1,
-        content_id: item.ContentID ? `${channel}:${item.ContentID}` : "",
-        channel,
-        title: plainText(item.Title),
-        author: plainText(item.AuthorName),
-        type: item.ContentType,
-        excerpt: plainText(item.ContentText).slice(0, 5000),
-        url: item.Url,
-        ...(item.EditTime &&
-        item.EditTime > 0 &&
-        item.EditTime * 1000 <= Date.now()
-          ? { updated_at: new Date(item.EditTime * 1000).toISOString() }
-          : {}),
-      }),
-    );
+    return searchData.data.Items.filter(
+      (item) =>
+        isZhihuPostUrl(item.Url) &&
+        ["answer", "article", "question"].includes(
+          item.ContentType.toLowerCase(),
+        ),
+    ).map((item, index) => ({
+      id: index + 1,
+      content_id: item.ContentID ? `zhihu:${item.ContentID}` : "",
+      channel: "zhihu",
+      title: plainText(item.Title),
+      author: plainText(item.AuthorName),
+      type: item.ContentType,
+      excerpt: plainText(item.ContentText).slice(0, 5000),
+      url: item.Url,
+      ...(item.EditTime &&
+      item.EditTime > 0 &&
+      item.EditTime * 1000 <= Date.now()
+        ? { updated_at: new Date(item.EditTime * 1000).toISOString() }
+        : {}),
+    }));
   }
   async generate(session: Session, sources: Source[]): Promise<Draft> {
     const mode = process.env.ZHIHU_GENERATION_MODE || "auto";

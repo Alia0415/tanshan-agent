@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { PURPOSES, type Session, type Purpose } from "../domain/types";
 import { AppError } from "../domain/validation";
+import { filterZhihuPosts } from "../domain/sources";
 import {
   createSession,
   clarify,
@@ -42,19 +43,32 @@ export function presentAgentReply(session: Session) {
           .join("\n");
     text += "\n你可以直接说，也可以回复“直接回答”。";
   } else if (answer) {
+    const posts = filterZhihuPosts(answer.sources);
     const refs = (ids: number[]) =>
       ids.length ? ` ${ids.map((id) => `[${id}]`).join("")}` : "";
     text = [
-      answer.summary + refs(answer.summary_citations),
-      ...answer.sections.map(
-        (section) =>
-          `${section.title}\n${section.body}${refs(section.citations)}`,
-      ),
-      ...answer.limitations,
-      ...answer.sources.map(
+      posts.length
+        ? `为你找到 ${posts.length} 篇知乎帖子（以下为搜索摘要）：`
+        : "本次没有检索到真实知乎帖子。",
+      ...posts.map(
         (source) =>
-          `[${source.id}] ${source.title} — ${source.author || "作者未提供"}（${source.channel === "global" ? "全网" : "知乎"}）\n${source.url}`,
+          `[${source.id}] ${source.title} — ${source.author || "作者未提供"}（知乎）\n${source.excerpt}\n${source.url}`,
       ),
+      ...(posts.length !== answer.sources.length
+        ? ["历史回答含有站外资料，旧总结已隐藏。新建提问将只检索知乎帖子。"]
+        : [
+            ...(answer.format === "source_excerpts"
+              ? []
+              : [
+                  "AI 辅助总结",
+                  answer.summary + refs(answer.summary_citations),
+                  ...answer.sections.map(
+                    (section) =>
+                      `${section.title}\n${section.body}${refs(section.citations)}`,
+                  ),
+                ]),
+            ...answer.limitations,
+          ]),
     ].join("\n\n");
   } else if (session.error) text = session.error.message;
   else text = "正在结合你的条件检索和整理资料。";
