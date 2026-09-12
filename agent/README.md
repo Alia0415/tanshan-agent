@@ -8,6 +8,8 @@
 
 ## 知乎 Skill 对应关系
 
+项目扩展：[知乎帖子状态匹配 Skill](../skills/zhihu-state-matching/SKILL.md)。围绕用户当前阶段、处境、限制和诉求定义追问、检索、排序及有来源依据的推荐理由。这是可加载的行为指令；网页服务运行时尚未同步实现这次规则更新。
+
 依据用户提供的 `zhihu` Skill 0.5.3-beta.20260904115023。开发接入走 `references/http-api.md`；已有 MCP 的配置走 `references/mcp.md`，不新建 MCP Server。文档中列出的能力不代表此账号已经获权或联调成功。
 
 | 能力               | Skill CLI 对应  | 本地实现                           | 状态                                      |
