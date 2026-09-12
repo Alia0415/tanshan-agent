@@ -48,3 +48,7 @@ POST /api/agent/messages 接收 message（1–2000 字符）、request_id（UUID
 本接口等待处理完成，当前没有流式输出。发生断线时先 GET /api/sessions/:id 检查是否仍在生成。后续消息携带旧版本会返回 409；首次消息创建暂不提供宿主事件级幂等。不要将此调试协议直接注册为未经确认的知乎 webhook。
 
 错误 SESSION_VERSION（410）表示旧版大学演示会话，需要新建，不会自动迁移或覆盖原记录。
+
+## 回答形式
+
+answer.format 可为 structured（引用编号已校验）、zhida_text（知乎直答普通文本，无逐条引用）或 source_excerpts（检索原始摘要）。普通文本的 evidence 为 unverified，相关检索资料不能当作正文证据。ZHIHU_GENERATION_MODE=sources 可在额度不足时完全跳过生成调用。

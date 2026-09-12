@@ -43,6 +43,7 @@ export interface AnswerSection {
   citations: number[];
 }
 export interface Answer {
+  format?: "structured" | "zhida_text" | "source_excerpts";
   id: string;
   context_version: number;
   context: Context;
@@ -53,7 +54,7 @@ export interface Answer {
   limitations: string[];
   sources: Source[];
   queries: string[];
-  evidence: "demo" | "sources" | "insufficient";
+  evidence: "demo" | "sources" | "insufficient" | "unverified";
   created_at: string;
 }
 export interface Session {

@@ -26,6 +26,7 @@ import {
 import {
   deduplicate,
   guidance,
+  sourceDraft,
   ZhihuProvider,
   type KnowledgeProvider,
 } from "./providers";
@@ -300,10 +301,21 @@ export async function runAnswer(
     if (!session) return;
     session.stage = "generating";
     saveSession(session);
-    const draft =
-      session.provider === "demo" || !sources.length
-        ? guidance(session, session.provider === "demo")
-        : await provider.generate(session, sources);
+    let draft;
+    if (session.provider === "demo" || !sources.length) {
+      draft = guidance(session, session.provider === "demo");
+    } else {
+      try {
+        draft = await provider.generate(session, sources);
+      } catch (error) {
+        if (!(error instanceof AppError) || error.code !== "RATE_LIMITED")
+          throw error;
+        draft = sourceDraft(
+          sources,
+          "知乎直答额度或频率受限，已停止生成并保留本次真实检索资料。",
+        );
+      }
+    }
     if (session.provider === "demo")
       await new Promise((resolve) => setTimeout(resolve, 650));
     session = isCurrent();
@@ -320,9 +332,11 @@ export async function runAnswer(
       evidence:
         session.provider === "demo"
           ? "demo"
-          : sources.length
-            ? "sources"
-            : "insufficient",
+          : draft.format === "zhida_text"
+            ? "unverified"
+            : sources.length
+              ? "sources"
+              : "insufficient",
       created_at: new Date().toISOString(),
     });
     session.stage = "completed";

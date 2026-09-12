@@ -76,7 +76,11 @@ export function AnswerCard({
             ? "演示回答"
             : answer.evidence === "insufficient"
               ? "资料不足"
-              : `${answer.sources.length} 条相关来源`}
+              : answer.format === "zhida_text"
+                ? "知乎直答 · 待核对"
+                : answer.format === "source_excerpts"
+                  ? "真实来源摘要"
+                  : `${answer.sources.length} 条相关来源`}
         </span>
       </div>
       <ContextTags context={answer.context} />
@@ -111,7 +115,10 @@ export function AnswerCard({
       </aside>
       <details className="sources" open={answer.sources.length > 0}>
         <summary>
-          查看参考来源 <span>{answer.sources.length}</span>
+          {answer.format === "zhida_text"
+            ? "相关检索资料（非逐条引用）"
+            : "查看参考来源"}{" "}
+          <span>{answer.sources.length}</span>
         </summary>
         {answer.sources.length ? (
           answer.sources.map((source) => (

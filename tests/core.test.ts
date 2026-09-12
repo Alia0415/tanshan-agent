@@ -601,3 +601,74 @@ test("legacy session data is preserved but rejected instead of misinterpreted", 
       .get(session.session_id),
   );
 });
+
+test("documented Zhida text response is shown without assigning retrieved citations", async () => {
+  const { parseTextDraft } = await import("../src/lib/server/providers");
+  const text = parseTextDraft(
+    "# 远程办公\n\n**体验差异**\n不同人的实际体验可能不同。",
+  );
+  assert.equal(text?.format, "zhida_text");
+  assert.equal(text?.summary_citations.length, 0);
+  assert.ok(text?.sections.every((section) => section.citations.length === 0));
+  assert.match(text!.limitations.join(""), /不能视为正文每项结论的证据/);
+  const session = start();
+  const request = randomUUID();
+  claimAnswer(session.session_id, owner, 1, request);
+  await runAnswer(session.session_id, 1, request, {
+    ...provider,
+    generate: async () => text!,
+  });
+  assert.equal(
+    getSession(session.session_id, owner).answers[0].evidence,
+    "unverified",
+  );
+});
+
+test("invalid JSON citations cannot bypass validation through text mode", async () => {
+  const { parseTextDraft } = await import("../src/lib/server/providers");
+  assert.equal(
+    parseTextDraft(JSON.stringify({ ...draft, summary_citations: [999] })),
+    undefined,
+  );
+  assert.equal(
+    parseTextDraft('```json\n{"summary": "invalid"}\n```'),
+    undefined,
+  );
+});
+
+test("sources mode never calls the exhausted generation endpoint", async () => {
+  const oldMode = process.env.ZHIHU_GENERATION_MODE;
+  const oldFetch = globalThis.fetch;
+  try {
+    process.env.ZHIHU_GENERATION_MODE = "sources";
+    globalThis.fetch = async () => {
+      throw new Error("No upstream call allowed");
+    };
+    const result = await new ZhihuProvider().generate(start(), [source]);
+    assert.equal(result.format, "source_excerpts");
+    assert.deepEqual(result.sections[0].citations, [source.id]);
+  } finally {
+    globalThis.fetch = oldFetch;
+    if (oldMode === undefined) delete process.env.ZHIHU_GENERATION_MODE;
+    else process.env.ZHIHU_GENERATION_MODE = oldMode;
+  }
+});
+
+test("generation quota errors retain actual sources and never retry generation", async () => {
+  const session = start();
+  const request = randomUUID();
+  let calls = 0;
+  claimAnswer(session.session_id, owner, 1, request);
+  await runAnswer(session.session_id, 1, request, {
+    ...provider,
+    generate: async () => {
+      calls++;
+      throw new AppError("RATE_LIMITED", "受控额度耗尽", 429);
+    },
+  });
+  const result = getSession(session.session_id, owner);
+  assert.equal(calls, 1);
+  assert.equal(result.stage, "completed");
+  assert.equal(result.answers[0].format, "source_excerpts");
+  assert.match(result.answers[0].limitations.join(""), /额度或频率受限/);
+});

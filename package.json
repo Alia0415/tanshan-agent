@@ -14,7 +14,8 @@
     "test": "tsx --test tests/*.test.ts",
     "test:smoke": "node scripts/smoke.mjs",
     "check": "npm run lint && npm run typecheck && npm test",
-    "agent:export": "tsx scripts/export-agent.ts"
+    "agent:export": "tsx scripts/export-agent.ts",
+    "test:zhihu": "tsx scripts/verify-zhihu.ts"
   },
   "dependencies": {
     "next": "^16.0.0",

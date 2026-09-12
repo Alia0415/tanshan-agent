@@ -18,7 +18,7 @@
 
 开发依据为用户提供的 `zhihu` Skill **0.5.3-beta.20260904115023**：`SKILL.md`、`references/http-api.md`、`references/mcp.md` 和 `references/hackathon.md`。Skill 允许开发接入场景直接使用 HTTP 文档，因此运行时通过服务端 HTTP 调用，无需把 CLI 安装到服务器。
 
-工具映射见 [agent/README.md](agent/README.md)。保留摘要、作者和原始链接；知乎和全网来源分别标明。总搜索调用最多三次，限流和鉴权失败立即停止，直答 POST 不自动重试。当前未配置真实凭证，真实接口和站内行为还没有联调验收。
+工具映射见 [agent/README.md](agent/README.md)。保留摘要、作者和原始链接；知乎和全网来源分别标明。总搜索调用最多三次，限流和鉴权失败立即停止，直答 POST 不自动重试。已验证真实知乎搜索、全网搜索和直答接口。直答实际可能返回 Markdown 文本，不能假定提供逐条引用。站内宿主行为仍待协议与联调。
 
 ## 本地运行
 
@@ -39,19 +39,23 @@ WENSHAN_PROVIDER=live
 ZHIHU_ACCESS_SECRET=填入自己的凭证
 ZHIHU_ANSWER_MODEL=zhida-thinking-1p5
 ZHIHU_TIMEOUT_MS=120000
+ZHIHU_GENERATION_MODE=auto
 ```
 
 凭证仅供服务端使用，不能加 `NEXT_PUBLIC_` 前缀或提交到 Git。切换配置后重启并新建会话。Access Secret 用于开放 API，不等同于知乎站内 Agent 身份或发布权限。
 
+直答额度不足时，可设 `ZHIHU_GENERATION_MODE=sources`：保留真实搜索与作者摘要，停止调用直答。恢复综合回答时改回 `auto` 并重启。普通直答文本单独标注为待核对，下方资料不冒充正文的逐条证据。
+
 ## 验证与配置
 
-| 命令                   | 用途                                       |
-| ---------------------- | ------------------------------------------ |
-| `npm run agent:export` | 从共享定义导出可阅读的人设与开场白         |
-| `npm run check`        | 代码规范、类型检查和受控测试               |
-| `npm run build`        | 生产构建                                   |
-| `npm start`            | 启动调试服务的生产版本                     |
-| `npm run test:smoke`   | 对已启动的 demo 服务验收卡片与文字对话接口 |
+| 命令                   | 用途                                                                                   |
+| ---------------------- | -------------------------------------------------------------------------------------- |
+| `npm run agent:export` | 从共享定义导出可阅读的人设与开场白                                                     |
+| `npm run test:zhihu`   | 显式真实联调：两次搜索与一次直答；sources 模式跳过直答，消耗业务额度，不在 CI 自动执行 |
+| `npm run check`        | 代码规范、类型检查和受控测试                                                           |
+| `npm run build`        | 生产构建                                                                               |
+| `npm start`            | 启动调试服务的生产版本                                                                 |
+| `npm run test:smoke`   | 对已启动的 demo 服务验收卡片与文字对话接口                                             |
 
 [接口文档](docs/API.md) · [架构](docs/ARCHITECTURE.md) · [演示脚本](docs/DEMO.md) · [验收状态](docs/ACCEPTANCE.md)
 

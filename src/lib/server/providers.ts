@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { ANSWER_INSTRUCTIONS } from "../agent/definition";
-import type { AnswerSection, Session, Source } from "../domain/types";
+import type { Answer, AnswerSection, Session, Source } from "../domain/types";
 import { AppError } from "../domain/validation";
 
 export interface Draft {
+  format?: Answer["format"];
   summary: string;
   summary_citations: number[];
   sections: AnswerSection[];
@@ -109,7 +110,7 @@ export function parseDraft(
 }
 
 async function request(url: string, options: RequestInit = {}) {
-  const secret = process.env.ZHIHU_ACCESS_SECRET;
+  const secret = process.env.ZHIHU_ACCESS_SECRET?.trim();
   if (!secret)
     throw new AppError(
       "AUTH_REQUIRED",
@@ -211,6 +212,44 @@ export function guidance(session: Session, demo: boolean): Draft {
   };
 }
 
+export function sourceDraft(sources: Source[], reason: string): Draft {
+  return {
+    format: "source_excerpts",
+    summary: "已找到相关资料。以下保留作者的原始摘要，供你逐条查看和判断。",
+    summary_citations: [],
+    sections: sources.slice(0, 5).map((source) => ({
+      title: source.title,
+      body: `${source.author || "该作者"}的内容摘要：${source.excerpt}`,
+      citations: [source.id],
+    })),
+    limitations: [reason, "摘要不是完整原文，个人经历不能代表普遍共识。"],
+  };
+}
+
+export function parseTextDraft(content: string): Draft | undefined {
+  const trimmed = content.trim();
+  // Invalid structured output must not escape citation validation as ordinary prose.
+  if (!trimmed || /^(?:```(?:json)?\s*)?[\[{]/i.test(trimmed)) return;
+  const body = plainText(trimmed)
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .slice(0, 20000);
+  if (!body) return;
+  return {
+    format: "zhida_text",
+    summary:
+      "以下是知乎直答的综合回答。相关检索资料单独列在下方，供你进一步核对。",
+    summary_citations: [],
+    sections: [{ title: "知乎直答", body, citations: [] }],
+    limitations: [
+      "这段直答没有提供可逐条核对的引用；下方检索资料不能视为正文每项结论的证据。",
+      ...(trimmed.length > 20000
+        ? ["回答较长，此处仅展示前 20,000 字符。"]
+        : []),
+    ],
+  };
+}
+
 export class ZhihuProvider implements KnowledgeProvider {
   async search(
     query: string,
@@ -256,6 +295,14 @@ export class ZhihuProvider implements KnowledgeProvider {
     );
   }
   async generate(session: Session, sources: Source[]): Promise<Draft> {
+    const mode = process.env.ZHIHU_GENERATION_MODE || "auto";
+    if (mode === "sources")
+      return sourceDraft(
+        sources,
+        "当前使用真实来源摘要模式，本次没有调用直答生成综合回答。",
+      );
+    if (mode !== "auto")
+      throw new AppError("CONFIGURATION", "直答模式配置无效。", 503);
     const result = await request(
       "https://developer.zhihu.com/v1/chat/completions",
       {
@@ -270,29 +317,32 @@ export class ZhihuProvider implements KnowledgeProvider {
             },
             {
               role: "user",
-              content: JSON.stringify({
-                question: session.focused_question,
-                confirmed_context: session.confirmed_context,
-                sources: sources.map(
-                  ({
-                    id,
-                    title,
-                    excerpt,
-                    author,
-                    channel,
-                    updated_at,
-                    url,
-                  }) => ({
-                    id,
-                    title,
-                    excerpt,
-                    author,
-                    channel,
-                    updated_at,
-                    url,
-                  }),
-                ),
-              }),
+              // Repeat the output contract in the task message: Zhida may prioritize it over system text.
+              content: `${ANSWER_INSTRUCTIONS}\n\n待整理的资料（JSON 数据）：\n${JSON.stringify(
+                {
+                  question: session.focused_question,
+                  confirmed_context: session.confirmed_context,
+                  sources: sources.map(
+                    ({
+                      id,
+                      title,
+                      excerpt,
+                      author,
+                      channel,
+                      updated_at,
+                      url,
+                    }) => ({
+                      id,
+                      title,
+                      excerpt,
+                      author,
+                      channel,
+                      updated_at,
+                      url,
+                    }),
+                  ),
+                },
+              )}\n\n现在只返回规定格式的 JSON 对象。`,
             },
           ],
         }),
@@ -322,22 +372,15 @@ export class ZhihuProvider implements KnowledgeProvider {
       )
     )
       throw new AppError("INCOMPLETE", "回答未能完整生成，请手动重试。", 502);
-    const draft = parseDraft(response.data.choices[0].message.content, sources);
-    if (draft) return draft;
-    // Reject unsupported model prose entirely; show retrieved excerpts with known references.
-    return {
-      summary:
-        "暂时无法可靠整理综合结论。以下保留已获取的相关资料摘要，供你自行核对。",
-      summary_citations: [],
-      sections: sources.slice(0, 5).map((source) => ({
-        title: source.title,
-        body: `${source.author || "该作者"}的内容摘要：${source.excerpt}`,
-        citations: [source.id],
-      })),
-      limitations: [
-        "回答格式或引用校验未通过，已降级为来源摘要，未呈现未经校验的模型结论。",
-        "来源编号有效不等于观点已经核实，仍需检查摘要是否支持结论。",
-      ],
-    };
+    const content = response.data.choices[0].message.content;
+    const draft = parseDraft(content, sources);
+    if (draft) return { ...draft, format: "structured" };
+    // Zhida documents text completions, not guaranteed JSON. Preserve prose without invented citations.
+    const text = parseTextDraft(content);
+    if (text) return text;
+    return sourceDraft(
+      sources,
+      "结构化回答或引用校验未通过，已保留真实来源摘要。",
+    );
   }
 }
