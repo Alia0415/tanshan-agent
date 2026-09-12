@@ -36,8 +36,12 @@
   will-change: transform;
 }
 
-.wave path {
+.waveBody {
   fill: currentColor;
+}
+
+.waveHighlight {
+  opacity: 0.82;
 }
 
 .backWave {
@@ -52,15 +56,6 @@
   top: -26px;
   color: #0861ea;
   animation: waveFront 3.9s linear infinite;
-}
-
-.liquidShine {
-  position: absolute;
-  z-index: 3;
-  inset: 0;
-  background:
-    radial-gradient(circle at 70% 12%, rgba(255, 255, 255, 0.22), transparent 25%),
-    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
 }
 
 .orbHighlight {
