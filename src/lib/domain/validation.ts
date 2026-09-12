@@ -3,24 +3,18 @@ import { z } from "zod";
 const text = z.string().trim().max(100);
 export const contextSchema = z
   .object({
-    school: text.nullable().optional(),
+    topic: text.nullable().optional(),
     purpose: z
-      .enum(["undergraduate", "postgraduate", "campus", "overview"])
+      .enum(["understand", "decide", "solve", "overview"])
       .nullable()
       .optional(),
-    major: text.nullable().optional(),
+    scenario: z.string().trim().max(500).nullable().optional(),
     priorities: z
       .array(z.string().trim().min(1).max(40))
       .max(2)
       .refine((a) => new Set(a).size === a.length, "关注点不能重复")
       .optional(),
-    province: text.nullable().optional(),
-    year: z
-      .string()
-      .regex(/^20\d{2}$/)
-      .nullable()
-      .optional(),
-    campus: text.nullable().optional(),
+    constraints: z.string().trim().max(500).nullable().optional(),
   })
   .strict();
 const version = z.number().int().positive();

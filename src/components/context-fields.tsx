@@ -1,14 +1,32 @@
 "use client";
-
 import { Check } from "lucide-react";
 import { PURPOSES, type Context, type Purpose } from "@/lib/domain/types";
 
-export const prioritiesFor = (purpose?: Purpose) =>
-  purpose === "campus"
-    ? ["住宿条件", "校园生活", "交通出行", "学习体验"]
-    : purpose === "postgraduate"
-      ? ["科研环境", "就业发展", "学习体验", "报考难度"]
-      : ["就业发展", "学习体验", "科研环境", "报考难度", "校园生活"];
+export const prioritiesFor = () => [
+  "成本与投入",
+  "时间与效率",
+  "风险与可靠性",
+  "难度与门槛",
+  "实际体验",
+  "长期影响",
+];
+const textFields = {
+  topic: {
+    label: "讨论对象",
+    placeholder: "例如：换工作、周末旅行、某款产品",
+    max: 100,
+  },
+  scenario: {
+    label: "场景或背景",
+    placeholder: "例如：工作三年，想换一个行业；或周末带家人出行",
+    max: 500,
+  },
+  constraints: {
+    label: "限制条件",
+    placeholder: "例如：预算、时间、地点，或不想接受的方案",
+    max: 500,
+  },
+} as const;
 
 export function ContextFields({
   value,
@@ -21,26 +39,12 @@ export function ContextFields({
   fields: string[];
   disabled?: boolean;
 }) {
-  const priorities = [
-    ...new Set([...prioritiesFor(value.purpose), ...value.priorities]),
-  ];
+  const priorities = [...new Set([...prioritiesFor(), ...value.priorities])];
   return (
     <div className="context-fields">
-      {fields.includes("school") && (
-        <label className="field-label">
-          学校
-          <input
-            value={value.school || ""}
-            onChange={(e) => onChange({ ...value, school: e.target.value })}
-            placeholder="学校名称，也可以暂不填写"
-            maxLength={100}
-            disabled={disabled}
-          />
-        </label>
-      )}
       {fields.includes("purpose") && (
         <fieldset disabled={disabled}>
-          <legend>这次了解的目的</legend>
+          <legend>这次提问的目的</legend>
           <div className="purpose-grid">
             {Object.entries(PURPOSES).map(([key, label], index) => (
               <button
@@ -56,10 +60,10 @@ export function ContextFields({
                   <small>
                     {
                       [
-                        "为下一段学习旅程做准备",
-                        "找到适合自己的研究方向",
-                        "看看在这里生活的样子",
-                        "先建立一个整体印象",
+                        "了解事实、观点和不同经历",
+                        "弄清差异，找到合适的选择",
+                        "梳理原因，找到可行的做法",
+                        "先给我一个整体回答",
                       ][index]
                     }
                   </small>
@@ -72,24 +76,21 @@ export function ContextFields({
           </div>
         </fieldset>
       )}
-      {fields.includes("major") && (
-        <label className="field-label">
-          意向专业<span className="muted">选填</span>
-          <input
-            value={value.major || ""}
-            onChange={(e) => onChange({ ...value, major: e.target.value })}
-            list="major-options"
-            placeholder="例如：计算机，或尚未确定"
-            maxLength={100}
-            disabled={disabled}
-          />
-          <datalist id="major-options">
-            <option value="计算机" />
-            <option value="医学" />
-            <option value="经管" />
-            <option value="尚未确定" />
-          </datalist>
-        </label>
+      {Object.entries(textFields).map(
+        ([key, config]) =>
+          fields.includes(key) && (
+            <label className="field-label" key={key}>
+              {config.label}
+              <span className="muted">选填</span>
+              <input
+                value={value[key as keyof typeof textFields] || ""}
+                onChange={(e) => onChange({ ...value, [key]: e.target.value })}
+                placeholder={config.placeholder}
+                maxLength={config.max}
+                disabled={disabled}
+              />
+            </label>
+          ),
       )}
       {fields.includes("priorities") && (
         <fieldset disabled={disabled}>
@@ -122,44 +123,10 @@ export function ContextFields({
               );
             })}
           </div>
-          <p className="field-hint">最多选择两项，帮助答案更聚焦。</p>
+          <p className="field-hint">
+            最多选择两项。没有合适的选项，也可以直接用文字补充。
+          </p>
         </fieldset>
-      )}
-      {fields.includes("campus") && (
-        <label className="field-label">
-          校区<span className="muted">选填</span>
-          <input
-            value={value.campus || ""}
-            onChange={(e) => onChange({ ...value, campus: e.target.value })}
-            placeholder="不确定可以留空"
-            maxLength={100}
-            disabled={disabled}
-          />
-        </label>
-      )}
-      {fields.includes("province") && value.purpose === "undergraduate" && (
-        <div className="two-fields">
-          <label className="field-label">
-            高考省份<span className="muted">选填</span>
-            <input
-              value={value.province || ""}
-              onChange={(e) => onChange({ ...value, province: e.target.value })}
-              maxLength={100}
-              disabled={disabled}
-            />
-          </label>
-          <label className="field-label">
-            年份<span className="muted">选填</span>
-            <input
-              value={value.year || ""}
-              onChange={(e) => onChange({ ...value, year: e.target.value })}
-              placeholder="例如 2026"
-              maxLength={4}
-              inputMode="numeric"
-              disabled={disabled}
-            />
-          </label>
-        </div>
       )}
     </div>
   );
@@ -169,13 +136,11 @@ export function ContextTags({ context }: { context: Context }) {
   return (
     <div className="tags">
       {[
-        context.school,
+        context.topic,
         context.purpose && PURPOSES[context.purpose],
-        context.major,
+        context.scenario,
         ...context.priorities,
-        context.campus,
-        context.province,
-        context.year,
+        context.constraints,
       ]
         .filter(Boolean)
         .map((label, index) => (

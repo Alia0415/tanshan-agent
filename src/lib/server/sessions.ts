@@ -9,6 +9,7 @@ import {
 } from "../domain/validation";
 import {
   buildQueries,
+  needsExternalEvidence,
   extractContext,
   focusQuestion,
   mergeContext,
@@ -34,6 +35,7 @@ export function createSession(question: string, token: string) {
   if (!["demo", "live"].includes(provider))
     throw new AppError("CONFIGURATION", "服务配置暂不可用。", 503);
   const session: Session = {
+    schema_version: 2,
     session_id: randomUUID(),
     original_question: question,
     stage: "understanding",
@@ -89,7 +91,7 @@ export function clarify(
       Object.keys(input.selections).some(
         (key) =>
           !session.clarification!.fields.includes(
-            key as "purpose" | "major" | "priorities",
+            key as "purpose" | "scenario" | "constraints" | "priorities",
           ),
       )
     )
@@ -240,10 +242,16 @@ export async function runAnswer(
     let successfulSearches = 0;
     if (session.provider === "live") {
       let lastError: unknown;
-      for (const query of queries) {
+      const searchPlan = queries.map((query) => ({
+        query,
+        channel: "zhihu" as "zhihu" | "global",
+      }));
+      if (needsExternalEvidence(session))
+        searchPlan.push({ query: queries[0], channel: "global" });
+      for (const { query, channel } of searchPlan) {
         if (!isCurrent()) return;
         try {
-          sources.push(...(await provider.search(query)));
+          sources.push(...(await provider.search(query, channel)));
           successfulSearches += 1;
         } catch (error) {
           if (
@@ -263,9 +271,9 @@ export async function runAnswer(
           new AppError("SEARCH_FAILED", "本次未能完成搜索，请稍后重试。", 502)
         );
       // One simplified retry, only for genuinely empty results; total query budget <= 3.
-      if (!sources.length && queries.length < 3) {
+      if (!sources.length && searchPlan.length < 3) {
         const simplified =
-          session.confirmed_context.school ||
+          session.confirmed_context.topic ||
           session.original_question.slice(0, 80);
         if (!queries.includes(simplified)) {
           queries.push(simplified);

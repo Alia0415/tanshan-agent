@@ -1,6 +1,6 @@
 {
   "name": "wenshan-agent",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "engines": {
     "node": ">=24.0.0"
@@ -13,7 +13,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "test:smoke": "node scripts/smoke.mjs",
-    "check": "npm run lint && npm run typecheck && npm test"
+    "check": "npm run lint && npm run typecheck && npm test",
+    "agent:export": "tsx scripts/export-agent.ts"
   },
   "dependencies": {
     "next": "^16.0.0",

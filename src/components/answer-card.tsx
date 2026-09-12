@@ -127,12 +127,13 @@ export function AnswerCard({
               <div>
                 <strong>{source.title}</strong>
                 <p>
+                  {source.channel === "global" ? "全网来源" : "知乎来源"} ·{" "}
                   {source.author || "作者未提供"} ·{" "}
                   {source.type === "Answer"
                     ? "回答"
                     : source.type === "Article"
                       ? "文章"
-                      : "社区内容"}
+                      : "内容"}
                   {source.updated_at && ` · ${source.updated_at.slice(0, 10)}`}
                 </p>
                 <small>

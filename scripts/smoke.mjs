@@ -29,7 +29,7 @@ async function request(
 let result = await request(
   "/api/sessions",
   "POST",
-  { question: "如何评价中山大学？" },
+  { question: "如何评价远程办公？" },
   201,
 );
 assert.equal(
@@ -42,12 +42,15 @@ assert.equal(result.session.stage, "clarifying");
 await request(path, "GET", undefined, 404, false);
 result = await request(`${path}/clarifications`, "POST", {
   context_version: 1,
-  selections: { purpose: "undergraduate" },
+  selections: { purpose: "decide" },
 });
 assert.equal(result.session.clarification_count, 1);
 result = await request(`${path}/clarifications`, "POST", {
   context_version: 2,
-  selections: { major: "计算机", priorities: ["就业发展", "学习体验"] },
+  selections: {
+    scenario: "工作三年，准备换工作",
+    priorities: ["实际体验", "长期影响"],
+  },
 });
 assert.equal(result.session.stage, "ready");
 assert.equal(result.session.clarification_count, 2);
@@ -72,7 +75,7 @@ await request(`${path}/feedback`, "POST", {
 });
 result = await request(`${path}/context`, "PATCH", {
   context_version: 3,
-  changes: { purpose: "postgraduate" },
+  changes: { purpose: "solve" },
 });
 assert.equal(result.session.context_version, 4);
 assert.equal(result.session.answers[0].context_version, 3);
@@ -89,6 +92,20 @@ const foreignOrigin = await fetch(`${base}/api/sessions`, {
   body: JSON.stringify({ question: "跨站测试" }),
 });
 assert.equal(foreignOrigin.status, 403);
+let agentReply = await request("/api/agent/messages", "POST", {
+  message: "如何评价远程办公？",
+  request_id: randomUUID(),
+});
+assert.equal(agentReply.stage, "clarifying");
+agentReply = await request("/api/agent/messages", "POST", {
+  message: "直接回答",
+  session_id: agentReply.session_id,
+  context_version: agentReply.context_version,
+  request_id: randomUUID(),
+});
+assert.equal(agentReply.stage, "completed");
+assert.equal(agentReply.answer.evidence, "demo");
+assert.match(agentReply.text, /流程演示/);
 console.log(
   "HTTP smoke passed: create, credential isolation, 2 rounds, answer idempotency, recovery, feedback, context version, old answer retention, input validation.",
 );

@@ -1,23 +1,28 @@
-# 问山 Wenshan
+# 问山 Agent
 
-多问一句，答案更近一步。
+面向**知乎站内对话**的通用问答 Agent 框架。先理解问题，必要时追问一两句，再结合知乎经验和可核查资料回答。覆盖工作、消费、生活、人际关系、技术与学习，领域不设固定枚举。
 
-基于 [PRD](docs/PRD.md) 的可运行 MVP 框架：围绕大学问题，通过最多两轮澄清确认目的，再组织检索与回答。前后端在同一个 Next.js 项目中。
+用户最新范围以 [Agent 范围说明](docs/AGENT_SCOPE.md) 为准；原 PRD 保留为历史背景。
 
-## 本次交付范围
+## 交付内容
 
-- 首页、三个示例问题、目的卡片、专业/关注点补充、跳过、确认、条件修改、答案、来源和反馈页面。
-- 服务端模板澄清，严格限制最多两轮/每卡最多两个字段/最多两个关注点。
-- PRD 的六组应用接口、匿名 HttpOnly Cookie、SQLite 持久会话、24 小时过期清理。
-- 请求幂等、并发生成限制、条件版本隔离、旧答案保留、刷新后读取当前任务；进程重启后明确标记中断，不自动重放生成。
-- 知乎 HTTP 搜索/直答适配器、1–2 个初始查询/至多一次简化/最多 3 个查询、链接去重、引用编号校验、安全纯文本渲染。
-- 无凭证也可运行的演示模式；不捏造知乎来源或学校事实。
+- `agent/`：Agent 人设、开场白、示例问题和知乎 Skill 工具映射。
+- `src/lib/agent/`：共享指令与文字消息处理入口，不依赖浏览器 DOM、表单或 Next.js。
+- `src/lib/domain/`：通用目的、背景、限制与关注点；最多两轮可跳过追问。
+- `src/lib/server/`：会话、身份隔离、版本与生成幂等；知乎搜索、全网搜索、知乎直答适配。
+- `src/app/`：本地调试页面和应用 HTTP 接口，方便验证 Agent 的行为。
 
-**这是 M1 交互闭环与 M2/M3 的工程基础，不是已通过真实 API 验收的上线产品。** 当前澄清采用模板；真实检索质量、模型引用忠实度、公网部署尚待验证。详见 [验收记录](docs/ACCEPTANCE.md)。
+**站内适配尚未完成。** 用户提供的知乎 Skill 描述了开放 API、CLI 和现有 MCP 服务，没有提供站内 Agent 的注册、消息事件、鉴权或发布协议。因此本仓库不声明官方 manifest/webhook，不创建新的 MCP Server，也未将本地页面作为 iframe 嵌入知乎。拿到实际站内创建入口及协议后，将宿主事件映射到 `receiveAgentMessage`；如果宿主直接托管提示词与工具，则使用 `agent/` 中的配置内容并按宿主要求绑定工具。
 
-## 本地启动
+## 使用知乎提供的 Skill
 
-使用 **Node.js 24 LTS**（会话层使用内置 `node:sqlite`，无需额外数据库安装）。
+开发依据为用户提供的 `zhihu` Skill **0.5.3-beta.20260904115023**：`SKILL.md`、`references/http-api.md`、`references/mcp.md` 和 `references/hackathon.md`。Skill 允许开发接入场景直接使用 HTTP 文档，因此运行时通过服务端 HTTP 调用，无需把 CLI 安装到服务器。
+
+工具映射见 [agent/README.md](agent/README.md)。保留摘要、作者和原始链接；知乎和全网来源分别标明。总搜索调用最多三次，限流和鉴权失败立即停止，直答 POST 不自动重试。当前未配置真实凭证，真实接口和站内行为还没有联调验收。
+
+## 本地运行
+
+使用 Node.js 24（SQLite 使用 Node.js 内置模块）：
 
 ```powershell
 npm ci
@@ -25,13 +30,9 @@ Copy-Item .env.example .env.local
 npm run dev
 ```
 
-打开 http://localhost:3000 。默认 `WENSHAN_PROVIDER=demo`，没有外部付费请求。页面会明确标注演示模式，回答展示一般性了解框架。
+打开 [本地调试入口](http://localhost:3000)。默认 `WENSHAN_PROVIDER=demo`，不发起外部 API 请求，不生成虚构来源。
 
-示例操作：输入「如何评价中山大学」→ 本科报考 → 计算机、就业发展/学习体验 → 开始分析 → 修改条件再问。
-
-## 接入知乎
-
-在本机编辑 `.env.local`，将以下配置填好后重启：
+启用真实资料时在 `.env.local` 设置：
 
 ```dotenv
 WENSHAN_PROVIDER=live
@@ -40,46 +41,31 @@ ZHIHU_ANSWER_MODEL=zhida-thinking-1p5
 ZHIHU_TIMEOUT_MS=120000
 ```
 
-凭证只在服务端读取，不能添加 `NEXT_PUBLIC_` 前缀。不要提交 `.env.local`。已有演示会话固定使用原模式，切换配置后请「开启新提问」。未配置 live 凭证时返回明确错误，不静默切换为演示结果。
+凭证仅供服务端使用，不能加 `NEXT_PUBLIC_` 前缀或提交到 Git。切换配置后重启并新建会话。Access Secret 用于开放 API，不等同于知乎站内 Agent 身份或发布权限。
 
-适配层依据用户提供的知乎 Skill 0.5.3-beta.20260904115023 中 HTTP 文档实现（文档标注核验时间 2026-07-16）。该版本文档的模型、权限和响应需要通过账号联调确认。工程不依赖安装知乎 CLI。
+## 验证与配置
 
-## 常用命令
+| 命令                   | 用途                                       |
+| ---------------------- | ------------------------------------------ |
+| `npm run agent:export` | 从共享定义导出可阅读的人设与开场白         |
+| `npm run check`        | 代码规范、类型检查和受控测试               |
+| `npm run build`        | 生产构建                                   |
+| `npm start`            | 启动调试服务的生产版本                     |
+| `npm run test:smoke`   | 对已启动的 demo 服务验收卡片与文字对话接口 |
 
-| 命令 | 用途 |
-| --- | --- |
-| `npm run dev` | 开发服务器 |
-| `npm run check` | ESLint、TypeScript、受控测试 |
-| `npm run build` | 生产构建 |
-| `npm start` | 生产服务器 |
-| `npm run test:smoke` | 对运行中的本地服务器执行 HTTP 主流程验收 |
+[接口文档](docs/API.md) · [架构](docs/ARCHITECTURE.md) · [演示脚本](docs/DEMO.md) · [验收状态](docs/ACCEPTANCE.md)
 
-## 目录
+## 运行边界
 
-```text
-src/
-  app/                    # App Router 页面和 HTTP 路由
-    api/sessions/         # 创建、恢复、澄清、修改、生成、反馈
-  components/             # 工作台、条件表单、答案和来源卡片
-  lib/
-    domain/               # 类型、输入约束、规则澄清、查询构造
-    server/               # SQLite、匿名身份、会话编排、知乎适配器
-tests/                    # 规则、并发、幂等、引用、异常的受控测试
-scripts/                  # HTTP smoke 脚本
-docs/                     # PRD、架构、接口、验收与演示脚本
-```
+当前采用单个 Node.js 实例与持久磁盘；多副本或临时磁盘 Serverless 需要共享存储及持久任务队列。匿名 Cookie 只服务于本地调试，不能替代站内宿主鉴权。
 
-扩展模型时实现 `KnowledgeProvider`；扩展存储时替换 `server/store.ts` 并保留事务、版本校验和请求唯一性。MVP 不引入多个 Agent、OAuth 或长期画像。
+v0.2 通用上下文与旧大学版不兼容。默认数据库改为 `.data/wenshan-agent-v2.sqlite`，旧数据库保留；显式使用旧数据库时旧会话返回 `SESSION_VERSION`，不会误用旧条件。
 
-## 部署
-
-采用**单个 Node.js 实例 + 持久磁盘**。SQLite/WAL、会话和后台请求依赖长驻进程，当前框架不适合直接使用临时磁盘的 Serverless 或多个副本。需要多实例时，先迁移至共享数据库和持久任务队列。
+Docker 可运行调试后端，但不是发布到知乎的操作：
 
 ```sh
 docker build -t wenshan-agent .
 docker run -d --name wenshan -p 3000:3000 --env-file .env.local -v wenshan-data:/app/.data wenshan-agent
 ```
 
-生产访问应在 HTTPS 反向代理后运行，匿名 Cookie 在生产模式使用 `Secure`。保持原始 Host/协议正确转发。生成接口会快速返回 202，浏览器通过 GET 读取阶段与结果；不使用长连接流式输出。生成请求上限可配置，默认 120 秒，单次查询上限 20 秒。
-
-依赖与构建过程参照 [Next.js 官方安装文档](https://nextjs.org/docs/app/getting-started/installation)。项目锁定的实际版本以 `package-lock.json` 为准。
+生产 Cookie 使用 Secure，HTTP 路由应置于 HTTPS 反向代理之后。原型尚未提供通用模型意图识别、逐字流式输出或站内发布集成。

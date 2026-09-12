@@ -18,7 +18,7 @@ export function db() {
   // The database is created at runtime; never trace local data or environment files into the build.
   const path = resolve(
     /* turbopackIgnore: true */ process.env.WENSHAN_DB_PATH ||
-      ".data/wenshan.sqlite",
+      ".data/wenshan-agent-v2.sqlite",
   );
   mkdirSync(dirname(path), { recursive: true });
   const connection = new DatabaseSync(path);
@@ -116,7 +116,14 @@ export function getSession(id: string, token?: string): Session {
       404,
     );
   }
-  return JSON.parse(row.data) as Session;
+  const session = JSON.parse(row.data) as Session;
+  if (session.schema_version !== 2)
+    throw new AppError(
+      "SESSION_VERSION",
+      "这是旧版演示会话，请开始新的提问。",
+      410,
+    );
+  return session;
 }
 
 export function saveSession(session: Session) {

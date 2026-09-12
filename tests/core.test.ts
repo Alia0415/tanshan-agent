@@ -59,60 +59,64 @@ const provider: KnowledgeProvider = {
   search: async () => [source],
   generate: async () => draft,
 };
-const start = (question = "中大计算机本科课程体验怎么样？") =>
+const start = (question = "远程办公的实际体验怎么样？") =>
   createSession(question, owner).session;
 
-test("A01: broad university question asks purpose only", () => {
-  const session = start("如何评价中山大学？");
-  assert.equal(session.stage, "clarifying");
-  assert.deepEqual(session.clarification?.fields, ["purpose"]);
-  assert.equal(session.confirmed_context.school, "中山大学");
-  assert.equal(session.confirmed_context.province, undefined);
-});
-
-test("A02/A04: explicit questions skip clarification and retain supplied facts", () => {
+test("general questions ask purpose across domains without inventing profile fields", () => {
   for (const question of [
-    "中大计算机本科课程体验怎么样？",
-    "我是广东高三学生，想了解中大计算机就业",
-    "中山大学在哪里？",
-    "先整体介绍一下中山大学，不要追问",
-    "北京今天是什么天气？",
+    "如何评价远程办公？",
+    "如何评价中山大学？",
+    "和室友一起生活怎么样？",
+    "想了解相机摄影",
   ]) {
-    const result = createSession(question, owner);
-    assert.equal(result.auto_answer, true, question);
-    assert.equal(result.session.stage, "ready", question);
+    const session = start(question);
+    assert.equal(session.stage, "clarifying", question);
+    assert.deepEqual(session.clarification?.fields, ["purpose"]);
+    assert.deepEqual(session.confirmed_context, { priorities: [] });
   }
-  const c = extractContext("我是广东高三学生，想了解中大计算机就业");
-  assert.equal(c.province, "广东");
-  assert.equal(c.purpose, "undergraduate");
-  assert.equal(c.major, "计算机");
 });
 
-test("A03/A08: two rounds produce focused queries and stop", () => {
-  const initial = start("如何评价中山大学？");
+test("clear questions and explicit priorities skip clarification", () => {
+  for (const question of [
+    "远程办公的实际体验怎么样？",
+    "北京在哪个城市圈？直接回答",
+    "光合作用是什么？",
+    "预算 6000 元，想买一台旅行相机",
+    "先整体介绍一下中山大学，不要追问",
+  ]) {
+    assert.equal(createSession(question, owner).auto_answer, true, question);
+  }
+  assert.deepEqual(extractContext("预算 6000 元，想买一台旅行相机"), {
+    priorities: ["成本与投入"],
+  });
+});
+
+test("two generic rounds retain scenario and limit search to two focused queries", () => {
+  const initial = start("如何评价远程办公？");
   const first = clarify(initial.session_id, owner, {
     context_version: 1,
-    selections: { purpose: "undergraduate" },
+    selections: { purpose: "decide" },
     skip: false,
   }).session;
-  assert.deepEqual(first.clarification?.fields, ["major", "priorities"]);
+  assert.deepEqual(first.clarification?.fields, ["scenario", "priorities"]);
   const final = clarify(initial.session_id, owner, {
-    context_version: first.context_version,
-    selections: { major: "计算机", priorities: ["就业发展", "学习体验"] },
+    context_version: 2,
+    selections: {
+      scenario: "工作三年，准备换工作",
+      priorities: ["实际体验", "长期影响"],
+    },
     skip: false,
   }).session;
   assert.equal(final.clarification_count, 2);
   assert.equal(final.stage, "ready");
-  assert.deepEqual(buildQueries(final), [
-    "中山大学 计算机 本科报考 就业发展",
-    "中山大学 计算机 本科报考 学习体验",
-  ]);
   assert.equal(final.clarification, undefined);
+  assert.equal(buildQueries(final).length, 2);
+  assert.ok(buildQueries(final).every((query) => query.includes("准备换工作")));
 });
 
-test("A05/A06: skip or overview immediately authorizes an answer", () => {
+test("skip or overview immediately authorizes an answer", () => {
   for (const selections of [{}, { purpose: "overview" as const }]) {
-    const session = start("如何评价中山大学？");
+    const session = start("如何评价远程办公？");
     const result = clarify(session.session_id, owner, {
       context_version: 1,
       selections,
@@ -120,41 +124,38 @@ test("A05/A06: skip or overview immediately authorizes an answer", () => {
     });
     assert.equal(result.auto_answer, true);
     assert.equal(result.session.stage, "ready");
-    assert.equal(result.session.clarification, undefined);
   }
 });
 
-test("A07: unparsed free text is preserved and never re-asked as the same card", () => {
-  const initial = start("如何评价中山大学？");
+test("unclassified free text reaches both search and generation without another question", () => {
+  const initial = start("如何评价远程办公？");
   const result = clarify(initial.session_id, owner, {
     context_version: 1,
     selections: {},
-    free_text: "希望参加天文社团，喜欢安静的环境",
+    free_text: "我需要照顾家人，希望能灵活安排",
     skip: false,
   });
   assert.equal(result.session.stage, "ready");
-  assert.match(result.session.focused_question, /天文社团/);
-  assert.deepEqual(result.session.free_text_context, [
-    "希望参加天文社团，喜欢安静的环境",
-  ]);
+  assert.match(result.session.focused_question, /照顾家人/);
+  assert.ok(
+    buildQueries(result.session).every((query) => query.includes("照顾家人")),
+  );
 });
 
-test("A09: changing purpose clears undergraduate-only conditions", () => {
+test("generic conditions are editable and nullable without domain-specific cleanup", () => {
   const next = mergeContext(
     {
-      school: "中山大学",
-      major: "计算机",
-      purpose: "undergraduate",
-      province: "广东",
-      year: "2026",
-      priorities: ["就业发展"],
+      topic: "相机",
+      scenario: "旅行",
+      constraints: "6000 元",
+      purpose: "decide",
+      priorities: [],
     },
-    { purpose: "postgraduate" },
+    { purpose: "understand", constraints: null },
   );
-  assert.equal(next.province, undefined);
-  assert.equal(next.year, undefined);
-  assert.equal(next.major, "计算机");
-  assert.equal(next.school, "中山大学");
+  assert.equal(next.constraints, undefined);
+  assert.equal(next.scenario, "旅行");
+  assert.equal(next.topic, "相机");
 });
 
 test("server validation rejects too many choices, state injection, and oversized questions", () => {
@@ -277,7 +278,7 @@ test("A14: a late answer cannot overwrite changed conditions", async () => {
   await waiting;
   updateContext(session.session_id, owner, {
     context_version: 1,
-    changes: { purpose: "postgraduate" },
+    changes: { purpose: "solve" },
   });
   release(draft);
   await old;
@@ -298,7 +299,7 @@ test("old completed answers remain available after a context edit", async () => 
   await runAnswer(session.session_id, 1, request, provider);
   const updated = updateContext(session.session_id, owner, {
     context_version: 1,
-    changes: { purpose: "campus", priorities: ["住宿条件"] },
+    changes: { purpose: "decide", priorities: ["长期影响"] },
   }).session;
   assert.equal(updated.answers.length, 1);
   assert.equal(updated.answers[0].context_version, 1);
@@ -424,4 +425,179 @@ test("provider recognizes business errors even when Data is null", async () => {
     globalThis.fetch = previousFetch;
     delete process.env.ZHIHU_ACCESS_SECRET;
   }
+});
+
+test("external evidence is requested separately and within the three-call budget", async () => {
+  const session = start("预算有限，想了解相机的价格和长期使用体验");
+  const request = randomUUID();
+  const calls: string[] = [];
+  claimAnswer(session.session_id, owner, 1, request);
+  await runAnswer(session.session_id, 1, request, {
+    search: async (_, channel) => {
+      calls.push(channel || "zhihu");
+      return [];
+    },
+    generate: async () => {
+      throw new Error("no evidence");
+    },
+  });
+  assert.deepEqual(calls, ["zhihu", "zhihu", "global"]);
+  assert.equal(
+    getSession(session.session_id, owner).answers[0].evidence,
+    "insufficient",
+  );
+});
+
+test("the provider maps global search to the documented endpoint and labels its evidence", async () => {
+  const previousFetch = globalThis.fetch;
+  process.env.ZHIHU_ACCESS_SECRET = "test-only-placeholder";
+  try {
+    globalThis.fetch = async (input) => {
+      assert.equal(
+        new URL(String(input)).pathname,
+        "/api/v1/content/global_search",
+      );
+      return Response.json({
+        Code: 0,
+        Data: {
+          Items: [
+            {
+              Title: "官方说明",
+              ContentType: "Article",
+              ContentID: "1",
+              ContentText: "测试资料",
+              Url: "https://example.com/official",
+              AuthorName: "测试机构",
+            },
+          ],
+        },
+      });
+    };
+    const result = await new ZhihuProvider().search("政策", "global");
+    assert.equal(result[0].channel, "global");
+    assert.equal(result[0].url, "https://example.com/official");
+  } finally {
+    globalThis.fetch = previousFetch;
+    delete process.env.ZHIHU_ACCESS_SECRET;
+  }
+});
+
+test("text-only agent conversation supports clarification, answer, revision, and identity isolation", async () => {
+  const { receiveAgentMessage } = await import("../src/lib/agent/bridge");
+  let reply = await receiveAgentMessage(
+    { message: "如何评价远程办公？", request_id: randomUUID() },
+    owner,
+    provider,
+  );
+  assert.equal(reply.stage, "clarifying");
+  assert.match(reply.text, /比较与选择/);
+  reply = await receiveAgentMessage(
+    {
+      message: "2",
+      session_id: reply.session_id,
+      context_version: reply.context_version,
+      request_id: randomUUID(),
+    },
+    owner,
+    provider,
+  );
+  assert.equal(reply.stage, "clarifying");
+  reply = await receiveAgentMessage(
+    {
+      message: "我需要照顾家人",
+      session_id: reply.session_id,
+      context_version: reply.context_version,
+      request_id: randomUUID(),
+    },
+    owner,
+    provider,
+  );
+  assert.equal(reply.stage, "completed");
+  assert.match(reply.text, /测试结论/);
+  assert.match(reply.text, /https:\/\/www.zhihu.com/);
+  assert.match(reply.answer!.queries[0], /照顾家人/);
+  const oldVersion = reply.context_version;
+  await assert.rejects(
+    () =>
+      receiveAgentMessage(
+        {
+          message: "继续",
+          session_id: reply.session_id,
+          context_version: reply.context_version,
+          request_id: randomUUID(),
+        },
+        "another-owner",
+        provider,
+      ),
+    (e: unknown) => e instanceof AppError && e.status === 404,
+  );
+  reply = await receiveAgentMessage(
+    {
+      message: "更关注长期影响",
+      session_id: reply.session_id,
+      context_version: reply.context_version,
+      request_id: randomUUID(),
+    },
+    owner,
+    provider,
+  );
+  assert.equal(reply.stage, "completed");
+  assert.ok(reply.context_version > oldVersion);
+  assert.equal(getSession(reply.session_id, owner).answers.length, 2);
+});
+
+test("text-only agent honors skipping without imposing required form fields", async () => {
+  const { receiveAgentMessage } = await import("../src/lib/agent/bridge");
+  const initial = await receiveAgentMessage(
+    { message: "如何评价远程办公？", request_id: randomUUID() },
+    owner,
+    provider,
+  );
+  const reply = await receiveAgentMessage(
+    {
+      message: "直接回答",
+      session_id: initial.session_id,
+      context_version: initial.context_version,
+      request_id: randomUUID(),
+    },
+    owner,
+    provider,
+  );
+  assert.equal(reply.stage, "completed");
+});
+
+test("long questions preserve the latest supplement within the search budget", () => {
+  const session = start("如何评价远程办公？" + "背景".repeat(900));
+  const updated = updateContext(session.session_id, owner, {
+    context_version: 1,
+    changes: { constraints: "周末无法工作" },
+    free_text: "最新条件：需要照顾家人",
+  }).session;
+  const queries = buildQueries(updated);
+  assert.ok(
+    queries.every(
+      (query) =>
+        query.length <= 2000 &&
+        query.includes("最新条件") &&
+        query.includes("周末无法工作"),
+    ),
+  );
+});
+
+test("legacy session data is preserved but rejected instead of misinterpreted", () => {
+  const session = start();
+  const old = { ...session, schema_version: undefined };
+  db()
+    .prepare("UPDATE sessions SET data = ? WHERE id = ?")
+    .run(JSON.stringify(old), session.session_id);
+  assert.throws(
+    () => getSession(session.session_id, owner),
+    (e: unknown) =>
+      e instanceof AppError && e.code === "SESSION_VERSION" && e.status === 410,
+  );
+  assert.ok(
+    db()
+      .prepare("SELECT id FROM sessions WHERE id = ?")
+      .get(session.session_id),
+  );
 });

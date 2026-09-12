@@ -1,7 +1,7 @@
 export const PURPOSES = {
-  undergraduate: "本科报考",
-  postgraduate: "考研择校",
-  campus: "校园生活",
+  understand: "了解与判断",
+  decide: "比较与选择",
+  solve: "解决具体问题",
   overview: "整体了解",
 } as const;
 export type Purpose = keyof typeof PURPOSES;
@@ -14,19 +14,17 @@ export type Stage =
   | "completed"
   | "error";
 export interface Context {
-  school?: string;
+  topic?: string;
   purpose?: Purpose;
-  major?: string;
+  scenario?: string;
   priorities: string[];
-  province?: string;
-  year?: string;
-  campus?: string;
+  constraints?: string;
 }
 export interface ClarificationCard {
   kind: "purpose" | "details";
   title: string;
   description: string;
-  fields: ("purpose" | "major" | "priorities")[];
+  fields: ("purpose" | "scenario" | "constraints" | "priorities")[];
 }
 export interface Source {
   id: number;
@@ -37,6 +35,7 @@ export interface Source {
   excerpt: string;
   url: string;
   updated_at?: string;
+  channel?: "zhihu" | "global";
 }
 export interface AnswerSection {
   title: string;
@@ -58,6 +57,7 @@ export interface Answer {
   created_at: string;
 }
 export interface Session {
+  schema_version: 2;
   session_id: string;
   original_question: string;
   stage: Stage;
@@ -74,11 +74,9 @@ export interface Session {
   error?: { code: string; message: string };
 }
 export interface ContextPatch {
-  school?: string | null;
+  topic?: string | null;
   purpose?: Purpose | null;
-  major?: string | null;
+  scenario?: string | null;
   priorities?: string[];
-  province?: string | null;
-  year?: string | null;
-  campus?: string | null;
+  constraints?: string | null;
 }

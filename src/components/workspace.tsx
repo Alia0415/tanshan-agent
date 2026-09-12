@@ -10,7 +10,7 @@ import {
   Check,
   ChevronRight,
   Compass,
-  GraduationCap,
+  BriefcaseBusiness,
   Leaf,
   LoaderCircle,
   MessageCircle,
@@ -27,25 +27,25 @@ import { ContextFields, ContextTags } from "./context-fields";
 import { AnswerCard } from "./answer-card";
 
 type Result = { session: Session; auto_answer?: boolean };
-const STORAGE_KEY = "wenshan.current-session";
+const STORAGE_KEY = "wenshan.agent-session-v2";
 const examples = [
   {
-    icon: GraduationCap,
-    category: "报考与择校",
-    text: "如何评价中山大学？",
-    hint: "从一所学校，开始探索",
+    icon: BriefcaseBusiness,
+    category: "工作与选择",
+    text: "要不要从大公司去创业公司？",
+    hint: "把选择放回自己的处境",
   },
   {
     icon: BookOpen,
-    category: "专业与成长",
-    text: "想了解一所大学的计算机专业，应该关注什么？",
-    hint: "找到适合自己的学习方向",
+    category: "消费与日常",
+    text: "想买一台相机，应该怎么选？",
+    hint: "先说用途，再谈推荐",
   },
   {
     icon: Leaf,
-    category: "校园与日常",
-    text: "中山大学的校园生活怎么样？",
-    hint: "看看课堂之外的生活",
+    category: "生活与关系",
+    text: "和室友作息不同，怎么办？",
+    hint: "找到适合你们的相处办法",
   },
 ];
 const emptyContext = (): Context => ({ priorities: [] });
@@ -311,13 +311,7 @@ export function Workspace() {
   function saveContext() {
     if (!session) return;
     const changes: ContextPatch = { ...context };
-    for (const key of [
-      "school",
-      "major",
-      "province",
-      "year",
-      "campus",
-    ] as const)
+    for (const key of ["topic", "scenario", "constraints"] as const)
       changes[key] = context[key] || null;
     void run("正在保存条件", async (ticket) => {
       const result = await api<Result>(
@@ -457,7 +451,7 @@ export function Workspace() {
           <div className="topbar-right">
             <span className="mode-badge">
               <span />
-              {session?.provider === "live" ? "知乎资料已连接" : "交互预览"}
+              {session?.provider === "live" ? "真实接口模式" : "Agent 调试预览"}
             </span>
             <button
               type="button"
@@ -490,7 +484,7 @@ export function Workspace() {
               <section className="hero">
                 <div className="hero-kicker">
                   <span />
-                  让答案，与你有关
+                  问山 Agent · 本地调试入口
                 </div>
                 <h1>
                   好问题，
@@ -540,7 +534,7 @@ export function Workspace() {
                   ref={questionInput}
                   value={question}
                   onChange={(event) => setQuestion(event.target.value)}
-                  placeholder="例如，如何评价中山大学？"
+                  placeholder="例如，要不要从大公司去创业公司？"
                   disabled={Boolean(busy) || restoring}
                   onKeyDown={(event) => {
                     if (
@@ -688,12 +682,11 @@ export function Workspace() {
                     value={context}
                     onChange={setContext}
                     fields={[
-                      "school",
+                      "topic",
                       "purpose",
-                      "major",
+                      "scenario",
                       "priorities",
-                      "campus",
-                      "province",
+                      "constraints",
                     ]}
                     disabled={Boolean(busy)}
                   />
@@ -954,7 +947,7 @@ export function Workspace() {
             </span>
             <h2 id="about-title">多问一句，答案更近一步。</h2>
             <p>
-              问山从你的目的出发，用最多两轮、可随时跳过的追问，把宽泛的大学问题变得更清晰。
+              问山从你的目的出发，用最多两轮、可随时跳过的追问，把工作、消费、生活、学习等问题变得更清晰。
             </p>
             <p>
               连接真实资料后，每次回答会展示可检查的来源。演示模式仅展示交互与一般性分析框架。
