@@ -114,7 +114,7 @@ export function parseDraft(
   }
 }
 
-async function request(url: string, options: RequestInit = {}) {
+export async function request(url: string, options: RequestInit = {}) {
   const secret = process.env.ZHIHU_ACCESS_SECRET?.trim();
   if (!secret)
     throw new AppError(
