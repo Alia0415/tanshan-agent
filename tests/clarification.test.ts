@@ -20,6 +20,7 @@ process.env.DEEPSEEK_API_KEY = "unit-test-only";
 const owner = "planner-tests";
 const ask = (question = "你主要用相机拍什么？") => ({
   action: "ask", question, description: "用途会影响镜头选择。",
+  selection_mode: "multiple",
   options: ["旅行风景", "人像日常"], placeholder: "描述你常拍的场景",
 });
 const card = (question?: string) => parseClarificationPlan(JSON.stringify(ask(question)))!;
@@ -109,6 +110,23 @@ test("question and selected answer retain their meaning in the planner, search a
     },
   });
   assert.equal(generated, true);
+});
+
+test("single and legacy cards reject multiple answers but accept one", async () => {
+  for (const selection_mode of ["single", undefined] as const) {
+    const planned = parseClarificationPlan(JSON.stringify({ ...ask(), selection_mode }))!;
+    assert.equal(planned.selection_mode, "single");
+    const { session } = await createSession("相机怎么选？", owner, async () => ({ ...planned, selection_mode }));
+    await assert.rejects(clarify(session.session_id, owner, clarifySchema.parse({
+      context_version: 1, answer: ["旅行风景", "人像日常"],
+    })), (error: unknown) => error instanceof AppError && error.code === "INVALID_SELECTION");
+    assert.equal(getSession(session.session_id, owner).context_version, 1);
+    const result = await clarify(session.session_id, owner, clarifySchema.parse({
+      context_version: 1, answer: ["旅行风景"],
+    }), async () => undefined);
+    assert.equal(result.session.clarification_history?.at(-1)?.answer, "旅行风景");
+  }
+  assert.throws(() => parseClarificationPlan(JSON.stringify({ ...ask(), selection_mode: "invalid" })), AppError);
 });
 
 test("multiple choices are validated and retained together with free text", async () => {

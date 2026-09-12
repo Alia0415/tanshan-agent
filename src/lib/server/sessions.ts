@@ -98,6 +98,8 @@ export async function clarify(
   )
     throw new AppError("INVALID_SELECTION", "请选择当前卡片提供的条件。");
   const answers = Array.isArray(input.answer) ? input.answer : input.answer ? [input.answer] : [];
+  if (answers.length > 1 && session.clarification.selection_mode !== "multiple")
+    throw new AppError("INVALID_SELECTION", "当前追问只能选择一个选项。");
   if (answers.length && (session.clarification.kind !== "contextual" ||
     answers.some((answer) => !session.clarification!.options?.includes(answer))))
     throw new AppError("INVALID_SELECTION", "请选择当前追问提供的选项，或使用文字补充。");

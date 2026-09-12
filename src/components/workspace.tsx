@@ -92,9 +92,9 @@ function remember(id?: string) {
   }
 }
 
-export function Workspace() {
+export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }) {
   const [session, setSession] = useState<Session | null>(null);
-  const [question, setQuestion] = useState("");
+  const [question, setQuestion] = useState(initialQuestion);
   const [context, setContext] = useState<Context>(emptyContext);
   const [freeText, setFreeText] = useState("");
   const [clarificationAnswers, setClarificationAnswers] = useState<string[]>([]);
@@ -151,6 +151,7 @@ export function Workspace() {
     const initialEpoch = epoch.current;
     async function restore() {
       try {
+        if (initialQuestion) return;
         const id = localStorage.getItem(STORAGE_KEY);
         if (!id) return;
         const result = await api<Result>(
@@ -178,7 +179,7 @@ export function Workspace() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialQuestion]);
 
   useEffect(() => {
     if (!finishingClarification) return;
@@ -430,7 +431,7 @@ export function Workspace() {
   };
 
   return (
-    <div className={`app-shell${showClarificationProgress ? " has-clarification-progress" : ""}`}>
+    <div className={`app-shell agent-workspace${showClarificationProgress ? " has-clarification-progress" : ""}`}>
       <aside className="sidebar">
         <Link className="brand" href="/" aria-label="问山首页">
           <span className="brand-icon">
@@ -817,13 +818,15 @@ export function Workspace() {
                   {session.clarification.kind === "contextual" ? (
                     Boolean(session.clarification.options?.length) && (
                       <fieldset disabled={Boolean(busy)}>
-                        <legend className="field-hint">选择符合你的情况的选项（可多选），也可以自由补充</legend>
+                        <legend className="field-hint">选择符合你的情况的选项（{session.clarification.selection_mode === "multiple" ? "可多选" : "单选"}），也可以自由补充</legend>
                         <div className="chips">
                           {session.clarification.options?.map((option) => (
                             <button type="button" key={option}
                               className={`chip ${clarificationAnswers.includes(option) ? "selected" : ""}`}
                               aria-pressed={clarificationAnswers.includes(option)}
-                              onClick={() => setClarificationAnswers((answers) => answers.includes(option) ? answers.filter((answer) => answer !== option) : [...answers, option])}>
+                              onClick={() => setClarificationAnswers((answers) => answers.includes(option)
+                                ? answers.filter((answer) => answer !== option)
+                                : session.clarification?.selection_mode === "multiple" ? [...answers, option] : [option])}>
                               {clarificationAnswers.includes(option) && <Check size={13} />}
                               {option}
                             </button>

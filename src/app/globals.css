@@ -2030,6 +2030,35 @@ summary {
   .page-footer { padding: 20px 16px; font-size: 10px; }
 }
 
+/* Give each clarification a clear question, choice, and supplement hierarchy. */
+.clarification-panel { padding: 28px; }
+.clarification-panel .panel-heading { gap: 10px; margin-bottom: 20px; }
+.clarification-panel .eyebrow { font-size: 12px; letter-spacing: 0; }
+.clarification-panel .round-count { padding: 5px 10px; border-radius: 20px; background: #f4f7fb; font-size: 11px; white-space: nowrap; }
+.clarification-panel > h2 { margin: 0 0 12px; font-size: 23px; line-height: 1.55; letter-spacing: 0; overflow-wrap: anywhere; }
+.clarification-panel .panel-description { margin: 0 0 26px; font-size: 14px; line-height: 1.8; }
+.clarification-panel > fieldset { min-width: 0; }
+.clarification-panel > fieldset > .field-hint { padding: 0 0 12px; margin: 0; font-size: 12px; line-height: 1.7; font-weight: 400; }
+.clarification-panel .chips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.clarification-panel .chip { position: relative; justify-content: flex-start; min-height: 52px; padding: 13px 16px 13px 38px; border: 1px solid #e3e8ef; border-radius: 8px; background: #fff; text-align: left; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+.clarification-panel .chip::before { content: ""; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; border: 1px solid #bdc8d6; border-radius: 4px; }
+.clarification-panel .chip:hover:not(:disabled) { border-color: #8bbcff; background: #f7faff; }
+.clarification-panel .chip.selected { border-color: #056de8; background: #edf5ff; color: #056de8; }
+.clarification-panel .chip.selected::before { background: #056de8; border-color: #056de8; }
+.clarification-panel .chip > svg { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #fff; }
+.clarification-panel .chip:focus-visible { outline: 2px solid #056de8; outline-offset: 3px; }
+.clarification-panel .supplement { margin-top: 24px; gap: 10px; font-size: 13px; }
+.clarification-panel .supplement .muted { margin-left: 0; font-size: 11px; }
+.clarification-panel .supplement textarea { min-height: 100px; padding: 13px 14px; border-radius: 8px; font-size: 14px; line-height: 1.7; }
+.clarification-panel .panel-actions { margin-top: 22px; padding-top: 18px; border-top: 1px solid #edf0f4; gap: 12px; }
+@media (max-width: 520px) {
+  .clarification-panel { padding: 20px 16px; }
+  .clarification-panel > h2 { font-size: 20px; }
+  .clarification-panel .chips { grid-template-columns: 1fr; }
+  .clarification-panel .panel-heading { gap: 8px; }
+  .clarification-panel .round-count { padding: 4px 7px; }
+}
+
 /* Keep the clarification indicator outside the reading column. */
 .app-shell .clarification-progress-float {
   pointer-events: none;
@@ -2048,3 +2077,17 @@ summary {
     height: 64px !important;
   }
 }
+
+.product-nav { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:10px 24px; border-bottom:1px solid var(--line); background:#fff; position:relative; z-index:60; }
+.product-nav a { text-decoration:none; padding:8px 14px; border-radius:8px; font-size:14px; }
+.product-nav a[aria-current="page"] { color:#056de8; background:#edf5ff; font-weight:600; }
+.product-nav .product-brand { font-size:18px; font-weight:700; margin-right:auto; }
+.reading-handoffs { display:flex; flex-wrap:wrap; gap:18px; margin:12px 0; color:#056de8; }
+@media(max-width:520px) { .product-nav { padding:8px; gap:2px; } .product-nav a { padding:8px; font-size:13px; } }
+
+.agent-workspace { position: relative; padding-top: 0; }
+.agent-workspace .topbar { position: relative; inset: auto; }
+.reading-scope .app-shell { padding-top: 0; }
+.reading-scope .topbar { inset: auto; top: 0; padding: 0; display: block; box-shadow: none; }
+.reading-scope .brand { margin: 0; }
+.roundtable-home { width: calc(100% - 32px); margin: 32px auto; padding: 0; }

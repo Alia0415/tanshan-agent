@@ -3,13 +3,13 @@ import { AppError } from "../domain/validation";
 
 /** Shared server-only transport. Never log upstream bodies or retry paid requests. */
 export async function deepseekJson(options: {
-  feature: "CLARIFICATION" | "SEARCH";
+  feature: "CLARIFICATION" | "SEARCH" | "READING";
   instructions: string;
   input: unknown;
   maxTokens: number;
   timeoutMs?: number;
 }): Promise<string> {
-  const label = options.feature === "CLARIFICATION" ? "追问" : "搜索优化";
+  const label = options.feature === "CLARIFICATION" ? "追问" : options.feature === "READING" ? "阅读整理" : "搜索优化";
   const fail = (suffix: string, message: string, status = 502) =>
     new AppError(`${options.feature}_${suffix}`, message, status);
   const key = process.env.DEEPSEEK_API_KEY?.trim();

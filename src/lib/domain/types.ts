@@ -27,6 +27,7 @@ export interface ClarificationCard {
   description: string;
   fields: ("purpose" | "scenario" | "constraints" | "priorities")[];
   options?: string[];
+  selection_mode?: "single" | "multiple";
   placeholder?: string;
 }
 export interface Source {

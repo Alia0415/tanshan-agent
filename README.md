@@ -91,3 +91,15 @@ docker run -d --name wenshan -p 3000:3000 --env-file .env.local -v wenshan-data:
 ```
 
 生产 Cookie 使用 Secure，HTTP 路由应置于 HTTPS 反向代理之后。模型规划已用于追问决策；尚未提供逐字流式输出或站内发布集成。
+
+## 统一应用入口
+
+运行根目录的 `npm run dev` 即可使用全部功能，无需单独启动阅读原型：
+
+- `/`：Agent 问答，保留追问、多选与历史会话。
+- `/reading`：知乎问题发现、回答阅读、阅读助手与阅读地图。
+- `/roundtable`：多立场圆桌与访客发言。
+
+顶部导航切换三种功能；阅读问题页可携带问题标题进入 Agent 或圆桌，用户确认提交后才开始请求。带入新问题时不会自动恢复旧 Agent 会话。阅读接口统一位于 `/api/reading/*`，使用根目录的 `ZHIHU_ACCESS_SECRET`，热榜记录保存在根目录 `.data/questions.json`。阅读与圆桌需要真实知乎服务，Agent 的 demo 配置不会生成模拟热榜。原 `prototype/reading-route` 保留作为历史原型，运行入口以主应用为准。
+
+阅读追问、分类与候选筛选统一使用根目录已配置的 DeepSeek JSON 模型；未配置 DeepSeek 时使用知乎直答。真实帖子仍全部来自知乎检索，模型不能生成来源链接。圆桌可视化会场及素材移植自 `origin/prototype/jianshan-roundtable`，连接主应用已有圆桌接口。预览进程须允许访问知乎和模型 API，否则页面可打开但无法读取真实内容。

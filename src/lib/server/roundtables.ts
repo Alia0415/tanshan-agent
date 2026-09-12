@@ -117,6 +117,10 @@ export async function startRoundtable(
     provider.search(question, 10),
     provider.search(question + " 经验", 10),
   ]);
+  for (const result of [primary, secondary]) {
+    if (result.status === "rejected" && result.reason instanceof AppError) throw result.reason;
+  }
+  if (primary.status === "rejected" && secondary.status === "rejected") throw primary.reason;
   const collected: Source[] = [];
   if (primary.status === "fulfilled") collected.push(...primary.value);
   if (secondary.status === "fulfilled") collected.push(...secondary.value);

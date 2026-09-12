@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ProductNav } from "@/components/product-nav";
 
 export const metadata: Metadata = {
   title: "问山 Wenshan · 多问一句，答案更近一步",
@@ -12,7 +13,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN">
-      <body>{children}</body>
+      <body><ProductNav />{children}</body>
     </html>
   );
 }
