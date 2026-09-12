@@ -89,6 +89,8 @@ export interface Session {
   expires_at: string;
   error?: { code: string; message: string };
 }
+export type SessionSummary = Pick<Session, "session_id" | "original_question" | "stage" | "created_at">;
+
 export interface ContextPatch {
   topic?: string | null;
   purpose?: Purpose | null;

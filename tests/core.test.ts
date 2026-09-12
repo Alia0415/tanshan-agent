@@ -24,7 +24,7 @@ import {
   updateContext,
   addFeedback,
 } from "../src/lib/server/sessions";
-import { getSession, db, cleanup } from "../src/lib/server/store";
+import { getSession, db, cleanup, listSessions, insertSession } from "../src/lib/server/store";
 import {
   deduplicate,
   parseDraft,
@@ -64,6 +64,22 @@ const provider: KnowledgeProvider = {
 };
 const start = async (question = "远程办公的实际体验怎么样？") =>
   (await createSession(question, owner)).session;
+
+test("history isolates owners, omits expired sessions and returns newest summaries first", async () => {
+  const token = randomUUID();
+  const base = await start();
+  const earlier = { ...base, session_id: randomUUID(), created_at: new Date(Date.now() - 10000).toISOString() };
+  const newer = { ...base, session_id: randomUUID(), created_at: new Date().toISOString() };
+  insertSession(earlier, token);
+  insertSession(newer, token);
+  insertSession({ ...base, session_id: randomUUID(), expires_at: new Date(Date.now() - 1).toISOString() }, token);
+  const history = listSessions(token);
+  assert.deepEqual(history.map((item) => item.session_id), [newer.session_id, earlier.session_id]);
+  assert.equal("answers" in history[0], false);
+  assert.deepEqual(listSessions(randomUUID()), []);
+  assert.equal(getSession(newer.session_id, token).original_question, base.original_question);
+  assert.throws(() => getSession(newer.session_id, "different-owner"), AppError);
+});
 
 test("general questions ask purpose across domains without inventing profile fields", async () => {
   for (const question of [

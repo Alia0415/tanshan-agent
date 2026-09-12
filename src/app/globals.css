@@ -10,6 +10,13 @@
   --accent: #c4d9f5;
   --sans: Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
 }
+.history-panel h1 { margin: 0; font-size: 24px; }
+.history-list { display: grid; gap: 12px; }
+.history-entry { display: grid; gap: 12px; width: 100%; padding: 18px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.history-entry:hover:not(:disabled) { background: var(--soft); }
+.history-entry strong { color: var(--ink); overflow-wrap: anywhere; line-height: 1.6; }
+.history-entry > span { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
+.history-empty { padding: 32px 0; text-align: center; color: var(--muted); }
 * {
   box-sizing: border-box;
 }

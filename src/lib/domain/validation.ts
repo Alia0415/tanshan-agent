@@ -32,7 +32,11 @@ export const clarifySchema = z
   .object({
     context_version: version,
     selections: contextSchema.default({}),
-    answer: z.string().trim().min(1).max(120).optional(),
+    answer: z.union([
+      z.string().trim().min(1).max(120),
+      z.array(z.string().trim().min(1).max(120)).min(1)
+        .refine((answers) => new Set(answers).size === answers.length, "选项不能重复"),
+    ]).optional(),
     free_text: freeText,
     skip: z.boolean().default(false),
   })

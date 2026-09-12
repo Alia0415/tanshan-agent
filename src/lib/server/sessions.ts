@@ -97,12 +97,13 @@ export async function clarify(
     )
   )
     throw new AppError("INVALID_SELECTION", "请选择当前卡片提供的条件。");
-  if (input.answer && (session.clarification.kind !== "contextual" ||
-    !session.clarification.options?.includes(input.answer)))
+  const answers = Array.isArray(input.answer) ? input.answer : input.answer ? [input.answer] : [];
+  if (answers.length && (session.clarification.kind !== "contextual" ||
+    answers.some((answer) => !session.clarification!.options?.includes(answer))))
     throw new AppError("INVALID_SELECTION", "请选择当前追问提供的选项，或使用文字补充。");
   if (
     !input.skip &&
-    !input.answer &&
+    !answers.length &&
     !input.free_text &&
     !Object.values(input.selections).some((value) =>
       Array.isArray(value) ? value.length > 0 : Boolean(value),
@@ -110,7 +111,7 @@ export async function clarify(
   )
     throw new AppError(
       "EMPTY_SELECTION",
-      "请选择一个选项、补充文字，或直接回答。",
+      "请选择至少一个选项、补充文字，或直接回答。",
     );
   const previousCard = session.clarification;
   session.confirmed_context = mergeContext(
@@ -118,7 +119,7 @@ export async function clarify(
     input.selections,
   );
   if (previousCard.kind === "contextual") {
-    const answer = [input.answer, input.free_text].filter(Boolean).join("；");
+    const answer = [...answers, input.free_text].filter(Boolean).join("；");
     if (answer) {
       // Keep the question with its answer so a short choice retains its meaning downstream.
       supplement(session, `关于「${previousCard.title}」：${answer}`, answer);

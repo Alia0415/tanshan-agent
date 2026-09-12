@@ -111,6 +111,25 @@ test("question and selected answer retain their meaning in the planner, search a
   assert.equal(generated, true);
 });
 
+test("multiple choices are validated and retained together with free text", async () => {
+  const { session } = await initial();
+  await assert.rejects(clarify(session.session_id, owner, clarifySchema.parse({
+    context_version: 1, answer: ["旅行风景", "不存在的选项"],
+  })), (error: unknown) => error instanceof AppError && error.code === "INVALID_SELECTION");
+  for (const answer of [[], ["旅行风景", "旅行风景"]]) {
+    assert.equal(clarifySchema.safeParse({ context_version: 1, answer }).success, false);
+  }
+  const result = await clarify(session.session_id, owner, clarifySchema.parse({
+    context_version: 1, answer: ["旅行风景", "人像日常"], free_text: "轻便优先",
+  }), async (current) => {
+    assert.equal(current.clarification_history?.at(-1)?.answer, "旅行风景；人像日常；轻便优先");
+    return undefined;
+  });
+  const saved = getSession(session.session_id, owner);
+  assert.equal(saved.clarification_history?.at(-1)?.answer, "旅行风景；人像日常；轻便优先");
+  assert.match(result.session.focused_question, /旅行风景.*人像日常.*轻便优先/u);
+});
+
 test("skip and explicit refusal do not make another paid model request", async () => {
   for (const input of [{ skip: true }, { skip: false, free_text: "直接回答" }, { skip: false, free_text: "不知道" }]) {
     const { session } = await initial();

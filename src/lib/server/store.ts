@@ -2,7 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createHash } from "node:crypto";
-import type { Session } from "../domain/types";
+import type { Session, SessionSummary } from "../domain/types";
 import { AppError } from "../domain/validation";
 
 type Row = { data: string; owner: string; expires: number };
@@ -98,6 +98,17 @@ export function insertSession(session: Session, token: string) {
       Date.parse(session.expires_at),
       JSON.stringify(session),
     );
+}
+
+export function listSessions(token: string): SessionSummary[] {
+  const rows = db().prepare("SELECT data FROM sessions WHERE owner = ? AND expires > ?")
+    .all(ownerHash(token), Date.now()) as { data: string }[];
+  return rows.map((row) => JSON.parse(row.data) as Session)
+    .filter((session) => session.schema_version === 2)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .map(({ session_id, original_question, stage, created_at }) => ({
+      session_id, original_question, stage, created_at,
+    }));
 }
 
 export function getSession(id: string, token?: string): Session {

@@ -6,6 +6,7 @@ import {
   ArrowDown,
   ArrowRight,
   BookOpen,
+  History,
   Check,
   Compass,
   BriefcaseBusiness,
@@ -20,7 +21,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { MAX_CLARIFICATION_ROUNDS, type Context, type ContextPatch, type Session } from "@/lib/domain/types";
+import { MAX_CLARIFICATION_ROUNDS, type Context, type ContextPatch, type Session, type SessionSummary } from "@/lib/domain/types";
 import { ContextFields, ContextTags } from "./context-fields";
 import { AnswerCard } from "./answer-card";
 import { WaveProgressFloat } from "./wave-progress";
@@ -96,13 +97,16 @@ export function Workspace() {
   const [question, setQuestion] = useState("");
   const [context, setContext] = useState<Context>(emptyContext);
   const [freeText, setFreeText] = useState("");
-  const [clarificationAnswer, setClarificationAnswer] = useState("");
+  const [clarificationAnswers, setClarificationAnswers] = useState<string[]>([]);
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
   const [restoring, setRestoring] = useState(true);
   const [finishingClarification, setFinishingClarification] = useState(false);
   const [editing, setEditing] = useState(false);
   const [about, setAbout] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<SessionSummary[]>([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const [connectionLost, setConnectionLost] = useState(false);
   const [reconnect, setReconnect] = useState(0);
   const lock = useRef(false);
@@ -130,7 +134,7 @@ export function Workspace() {
     if (session?.stage === "clarifying" && next.stage !== "clarifying") {
       setFinishingClarification(true);
     }
-    setClarificationAnswer("");
+    setClarificationAnswers([]);
     setSession((previous) =>
       previous &&
       previous.session_id === next.session_id &&
@@ -306,7 +310,7 @@ export function Workspace() {
           {
             context_version: session.context_version,
             selections,
-            ...(clarificationAnswer ? { answer: clarificationAnswer } : {}),
+            ...(clarificationAnswers.length ? { answer: clarificationAnswers } : {}),
             free_text: freeText,
             skip,
           },
@@ -345,6 +349,7 @@ export function Workspace() {
   }
   function newQuestion() {
     if (busy) return;
+    setHistoryOpen(false);
     epoch.current += 1;
     setSession(null);
     setFinishingClarification(false);
@@ -352,19 +357,48 @@ export function Workspace() {
     setContext(emptyContext());
     setFreeText("");
     setEditing(false);
-    setClarificationAnswer("");
+    setClarificationAnswers([]);
     setNotice("");
     setConnectionLost(false);
     remember();
     pendingAnswer.current = null;
     requestAnimationFrame(() => questionInput.current?.focus());
   }
+  function openHistory() {
+    if (lock.current || restoring) return;
+    setHistoryOpen(true);
+    setHistoryLoaded(false);
+    void run("正在读取历史问题", async () => {
+      const result = await api<{ sessions: SessionSummary[] }>("/api/sessions");
+      setHistory(result.sessions);
+      setHistoryLoaded(true);
+    });
+  }
+  function openSession(id: string) {
+    void run("正在打开问题", async () => {
+      const result = await api<Result>(`/api/sessions/${encodeURIComponent(id)}`);
+      epoch.current += 1;
+      setSession(result.session);
+      setContext(structuredClone(result.session.confirmed_context));
+      remember(id);
+      setFreeText("");
+      setClarificationAnswers([]);
+      setEditing(false);
+      setFinishingClarification(false);
+      setConnectionLost(false);
+      pendingAnswer.current = null;
+      setReconnect((value) => value + 1);
+      setBusy("");
+      setHistoryOpen(false);
+    });
+  }
+  const stageLabels = { understanding: "理解中", clarifying: "待补充", ready: "待分析", searching: "检索中", generating: "生成中", completed: "已回答", error: "未完成" };
   const isWorking =
     session && ["searching", "generating"].includes(session.stage);
   const showClarificationProgress =
     Boolean(session) &&
     ((session?.stage === "clarifying" && Boolean(session.clarification)) || finishingClarification) &&
-    !editing && !about;
+    !editing && !about && !historyOpen;
   const clarificationRound = Math.min(
     MAX_CLARIFICATION_ROUNDS,
     (session?.clarification_count ?? 0) + 1,
@@ -418,16 +452,20 @@ export function Workspace() {
         <div className="sidebar-label">你的探索空间</div>
         <button
           type="button"
-          className="sidebar-item active"
-          onClick={() =>
+          className={`sidebar-item${historyOpen ? "" : " active"}`}
+          onClick={() => {
+            setHistoryOpen(false);
             document
               .getElementById("main-content")
-              ?.scrollIntoView({ behavior: "smooth" })
-          }
+              ?.scrollIntoView({ behavior: "smooth" });
+          }}
         >
           <MessageCircle size={17} />
           {session ? "当前提问" : "开始探索"}
           <span className="active-dot" />
+        </button>
+        <button type="button" className={`sidebar-item${historyOpen ? " active" : ""}`} onClick={openHistory} disabled={Boolean(busy) || restoring}>
+          <History size={17} />历史问题
         </button>
         {session && (
           <p className="current-question">{session.original_question}</p>
@@ -469,7 +507,8 @@ export function Workspace() {
             </span>
             <Link className="header-brand" href="/">问山</Link>
             <nav className="header-nav" aria-label="主导航">
-              <button type="button" className="nav-current" onClick={() => document.getElementById("main-content")?.scrollIntoView({ behavior: "smooth" })}>{session ? "当前提问" : "首页"}</button>
+              <button type="button" className={historyOpen ? "" : "nav-current"} onClick={() => { setHistoryOpen(false); document.getElementById("main-content")?.scrollIntoView({ behavior: "smooth" }); }}>{session ? "当前提问" : "首页"}</button>
+              <button type="button" className={historyOpen ? "nav-current" : ""} onClick={openHistory} disabled={Boolean(busy) || restoring}>历史问题</button>
               <button type="button" onClick={() => setAbout(true)}>关于问山</button>
             </nav>
           </div>
@@ -504,7 +543,24 @@ export function Workspace() {
               </button>
             </div>
           )}
-          {!session ? (
+          {historyOpen ? (
+            <section className="panel history-panel" aria-labelledby="history-title">
+              <div className="panel-heading">
+                <h1 id="history-title">历史问题</h1>
+                <button type="button" className="text-button" onClick={() => setHistoryOpen(false)}>返回{session ? "当前提问" : "首页"}</button>
+              </div>
+              <p className="panel-description">当前浏览器最近 24 小时的提问，按时间从新到旧排列。点击可查看回答或继续提问。</p>
+              {busy && <p role="status">{busy}…</p>}
+              {!busy && !historyLoaded && <button type="button" className="text-button" onClick={openHistory}>重新加载</button>}
+              {historyLoaded && history.length === 0 && <p className="history-empty">还没有历史问题，开启一次新提问吧。</p>}
+              {historyLoaded && <div className="history-list">{history.map((item) => (
+                <button type="button" className="history-entry" key={item.session_id} disabled={Boolean(busy)} onClick={() => openSession(item.session_id)}>
+                  <strong>{item.original_question}</strong>
+                  <span><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString("zh-CN")}</time><span>{stageLabels[item.stage]}{item.session_id === sessionId ? " · 当前" : ""}</span></span>
+                </button>
+              ))}</div>}
+            </section>
+          ) : !session ? (
             <>
               <section className="hero">
                 <div className="hero-kicker">
@@ -761,14 +817,14 @@ export function Workspace() {
                   {session.clarification.kind === "contextual" ? (
                     Boolean(session.clarification.options?.length) && (
                       <fieldset disabled={Boolean(busy)}>
-                        <legend className="sr-only">选择最符合你的情况的一项，也可以自由补充</legend>
+                        <legend className="field-hint">选择符合你的情况的选项（可多选），也可以自由补充</legend>
                         <div className="chips">
                           {session.clarification.options?.map((option) => (
                             <button type="button" key={option}
-                              className={`chip ${clarificationAnswer === option ? "selected" : ""}`}
-                              aria-pressed={clarificationAnswer === option}
-                              onClick={() => setClarificationAnswer(clarificationAnswer === option ? "" : option)}>
-                              {clarificationAnswer === option && <Check size={13} />}
+                              className={`chip ${clarificationAnswers.includes(option) ? "selected" : ""}`}
+                              aria-pressed={clarificationAnswers.includes(option)}
+                              onClick={() => setClarificationAnswers((answers) => answers.includes(option) ? answers.filter((answer) => answer !== option) : [...answers, option])}>
+                              {clarificationAnswers.includes(option) && <Check size={13} />}
                               {option}
                             </button>
                           ))}
@@ -803,7 +859,7 @@ export function Workspace() {
                       type="button"
                       className="primary"
                       onClick={() => submitClarification(false)}
-                      disabled={Boolean(busy) || (session.clarification.kind === "contextual" && !clarificationAnswer && !freeText.trim())}
+                      disabled={Boolean(busy) || (session.clarification.kind === "contextual" && !clarificationAnswers.length && !freeText.trim())}
                     >
                       {busy ? (
                         <LoaderCircle className="spin" size={16} />
