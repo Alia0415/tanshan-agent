@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { z } from "zod";
-import type { Session } from "../domain/types";
+import { MAX_CLARIFICATION_ROUNDS, type Session } from "../domain/types";
 import {
   AppError,
   type clarifySchema,
@@ -12,8 +12,8 @@ import {
   extractContext,
   focusQuestion,
   mergeContext,
-  nextCard,
 } from "../domain/clarification";
+import { planClarification, type ClarificationPlanner } from "./clarification-planner";
 import { filterZhihuPosts } from "../domain/sources";
 import {
   checkVersion,
@@ -31,7 +31,7 @@ import {
   type KnowledgeProvider,
 } from "./providers";
 
-export function createSession(question: string, token: string) {
+export async function createSession(question: string, token: string, planner: ClarificationPlanner = planClarification) {
   const provider = process.env.WENSHAN_PROVIDER || "demo";
   if (!["demo", "live"].includes(provider))
     throw new AppError("CONFIGURATION", "服务配置暂不可用。", 503);
@@ -47,22 +47,23 @@ export function createSession(question: string, token: string) {
       extractContext(question),
     ),
     free_text_context: [],
+    clarification_history: [],
     focused_question: "",
     answers: [],
     provider: provider as "demo" | "live",
     created_at: new Date().toISOString(),
     expires_at: new Date(Date.now() + 86400000).toISOString(),
   };
-  session.clarification = nextCard(session);
+  session.clarification = await planner(session);
   session.stage = session.clarification ? "clarifying" : "ready";
   session.focused_question = focusQuestion(session);
   insertSession(session, token);
   return { session, auto_answer: !session.clarification };
 }
 
-function supplement(session: Session, text?: string) {
+function supplement(session: Session, text?: string, contextText = text) {
   if (!text) return;
-  if (session.free_text_context.join("").length + text.length > 8000)
+  if (session.free_text_context.join("").length + text.length > 16000)
     throw new AppError(
       "CONTEXT_LIMIT",
       "当前会话补充较多，请精简条件或开始新的提问。",
@@ -70,66 +71,92 @@ function supplement(session: Session, text?: string) {
   session.free_text_context.push(text);
   session.confirmed_context = mergeContext(
     session.confirmed_context,
-    extractContext(text),
+    extractContext(contextText || ""),
   );
 }
 
-export function clarify(
+export async function clarify(
   id: string,
   token: string,
   input: z.infer<typeof clarifySchema>,
+  planner: ClarificationPlanner = planClarification,
 ) {
-  return transaction(() => {
-    const session = getSession(id, token);
-    checkVersion(session, input.context_version);
-    if (session.stage !== "clarifying" || !session.clarification)
-      throw new AppError(
-        "INVALID_STAGE",
-        "当前无需补充条件，请使用最新页面。",
-        409,
-      );
-    if (
-      Object.keys(input.selections).some(
-        (key) =>
-          !session.clarification!.fields.includes(
-            key as "purpose" | "scenario" | "constraints" | "priorities",
-          ),
-      )
-    )
-      throw new AppError("INVALID_SELECTION", "请选择当前卡片提供的条件。");
-    if (
-      !input.skip &&
-      !input.free_text &&
-      !Object.values(input.selections).some((value) =>
-        Array.isArray(value) ? value.length > 0 : Boolean(value),
-      )
-    )
-      throw new AppError(
-        "EMPTY_SELECTION",
-        "请选择一个选项、补充文字，或直接回答。",
-      );
-    const previousCard = session.clarification;
-    session.confirmed_context = mergeContext(
-      session.confirmed_context,
-      input.selections,
+  const session = getSession(id, token);
+  checkVersion(session, input.context_version);
+  if (session.stage !== "clarifying" || !session.clarification)
+    throw new AppError(
+      "INVALID_STAGE",
+      "当前无需补充条件，请使用最新页面。",
+      409,
     );
+  if (
+    Object.keys(input.selections).some(
+      (key) =>
+        !session.clarification!.fields.includes(
+          key as "purpose" | "scenario" | "constraints" | "priorities",
+        ),
+    )
+  )
+    throw new AppError("INVALID_SELECTION", "请选择当前卡片提供的条件。");
+  if (input.answer && (session.clarification.kind !== "contextual" ||
+    !session.clarification.options?.includes(input.answer)))
+    throw new AppError("INVALID_SELECTION", "请选择当前追问提供的选项，或使用文字补充。");
+  if (
+    !input.skip &&
+    !input.answer &&
+    !input.free_text &&
+    !Object.values(input.selections).some((value) =>
+      Array.isArray(value) ? value.length > 0 : Boolean(value),
+    )
+  )
+    throw new AppError(
+      "EMPTY_SELECTION",
+      "请选择一个选项、补充文字，或直接回答。",
+    );
+  const previousCard = session.clarification;
+  session.confirmed_context = mergeContext(
+    session.confirmed_context,
+    input.selections,
+  );
+  if (previousCard.kind === "contextual") {
+    const answer = [input.answer, input.free_text].filter(Boolean).join("；");
+    if (answer) {
+      // Keep the question with its answer so a short choice retains its meaning downstream.
+      supplement(session, `关于「${previousCard.title}」：${answer}`, answer);
+      session.clarification_history = [...(session.clarification_history || []),
+        { question: previousCard.title, answer }];
+    }
+  } else {
     supplement(session, input.free_text);
-    session.clarification_count += 1;
-    session.context_version += 1;
-    // A submitted card is never re-asked if free text could not be classified.
-    session.clarification =
-      !input.skip &&
-      previousCard.kind === "purpose" &&
-      session.confirmed_context.purpose
-        ? nextCard(session)
-        : undefined;
-    session.stage = session.clarification ? "clarifying" : "ready";
-    session.focused_question = focusQuestion(session);
+    session.clarification_history = [...(session.clarification_history || []), {
+      question: previousCard.title,
+      answer: [JSON.stringify(input.selections), input.free_text].filter(Boolean).join("；"),
+    }];
+  }
+  session.clarification_count += 1;
+  session.context_version += 1;
+  // Plan outside the SQLite transaction; a late model reply cannot overwrite a context edit.
+  session.clarification =
+    !input.skip &&
+    session.clarification_count < MAX_CLARIFICATION_ROUNDS &&
+    !/^(直接回答|跳过|不用追问|不要追问|不知道|不清楚|不想说)[。！!]?$/u.test(input.free_text || "") &&
+    (previousCard.kind === "contextual" ||
+      (previousCard.kind === "purpose" && session.confirmed_context.purpose))
+      ? await planner(session)
+      : undefined;
+  session.stage = session.clarification ? "clarifying" : "ready";
+  session.focused_question = focusQuestion(session);
+  return transaction(() => {
+    const current = getSession(id, token);
+    checkVersion(current, input.context_version);
+    if (current.stage !== "clarifying")
+      throw new AppError("INVALID_STAGE", "当前状态已更新，请刷新后继续。", 409);
     saveSession(session);
     return {
       session,
       auto_answer:
-        input.skip || session.confirmed_context.purpose === "overview",
+        !session.clarification && (previousCard.kind === "contextual" ||
+          input.skip || session.confirmed_context.purpose === "overview"),
     };
   });
 }

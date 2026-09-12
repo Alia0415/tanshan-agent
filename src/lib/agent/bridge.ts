@@ -41,6 +41,8 @@ export function presentAgentReply(session: Session) {
         Object.values(PURPOSES)
           .map((label, i) => `${i + 1}. ${label}`)
           .join("\n");
+    if (session.clarification.kind === "contextual" && session.clarification.options?.length)
+      text += "\n" + session.clarification.options.map((option, i) => `${i + 1}. ${option}`).join("\n");
     text += "\n你可以直接说，也可以回复“直接回答”。";
   } else if (answer) {
     const posts = filterZhihuPosts(answer.sources);
@@ -93,7 +95,7 @@ export async function receiveAgentMessage(
   if (!ownerToken) throw new AppError("AUTH_REQUIRED", "缺少会话身份。", 401);
   let session: Session;
   if (!input.session_id)
-    session = createSession(input.message, ownerToken).session;
+    session = (await createSession(input.message, ownerToken)).session;
   else {
     session = getSession(input.session_id, ownerToken);
     if (session.context_version !== input.context_version)
@@ -112,14 +114,17 @@ export async function receiveAgentMessage(
           input.message === String(i + 1),
       )?.[0] as Purpose | undefined;
       const purposeChoice = session.clarification?.kind === "purpose" && choice;
-      session = clarify(session.session_id, ownerToken, {
+      const options = session.clarification?.kind === "contextual" ? session.clarification.options || [] : [];
+      const answer = options.find((option, i) => input.message === option || input.message === String(i + 1));
+      session = (await clarify(session.session_id, ownerToken, {
         context_version: session.context_version,
         selections: purposeChoice ? { purpose: purposeChoice } : {},
-        free_text: purposeChoice ? undefined : input.message,
+        answer,
+        free_text: purposeChoice || answer ? undefined : input.message,
         skip: /^(直接回答|跳过|不用追问|不要追问)[。！!]?$/u.test(
           input.message,
         ),
-      }).session;
+      })).session;
     } else if (!/^(直接回答|继续|重试)[。！!]?$/u.test(input.message)) {
       session = updateContext(session.session_id, ownerToken, {
         context_version: session.context_version,

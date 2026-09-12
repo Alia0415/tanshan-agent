@@ -1,5 +1,6 @@
 import {
   PURPOSES,
+  MAX_CLARIFICATION_ROUNDS,
   type Context,
   type ContextPatch,
   type Session,
@@ -65,7 +66,7 @@ export function focusQuestion(
 
 export function nextCard(session: Session): ClarificationCard | undefined {
   const c = session.confirmed_context;
-  if (session.clarification_count >= 2 || c.purpose === "overview") return;
+  if (session.clarification_count >= MAX_CLARIFICATION_ROUNDS || c.purpose === "overview") return;
   if (
     /直接回答|不要追问|不用追问|先整体|是什么|在哪里|在哪个城市|多少|哪年|今天.*天气/.test(
       session.original_question,

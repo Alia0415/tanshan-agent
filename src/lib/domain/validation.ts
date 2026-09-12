@@ -32,6 +32,7 @@ export const clarifySchema = z
   .object({
     context_version: version,
     selections: contextSchema.default({}),
+    answer: z.string().trim().min(1).max(120).optional(),
     free_text: freeText,
     skip: z.boolean().default(false),
   })

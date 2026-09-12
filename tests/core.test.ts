@@ -40,6 +40,7 @@ process.env.WENSHAN_DB_PATH = join(
   "sessions.sqlite",
 );
 process.env.WENSHAN_PROVIDER = "live";
+process.env.WENSHAN_CLARIFICATION_MODE = "local";
 const owner = "browser-owner";
 const source: Source = {
   id: 1,
@@ -60,24 +61,24 @@ const provider: KnowledgeProvider = {
   search: async () => [source],
   generate: async () => draft,
 };
-const start = (question = "远程办公的实际体验怎么样？") =>
-  createSession(question, owner).session;
+const start = async (question = "远程办公的实际体验怎么样？") =>
+  (await createSession(question, owner)).session;
 
-test("general questions ask purpose across domains without inventing profile fields", () => {
+test("general questions ask purpose across domains without inventing profile fields", async () => {
   for (const question of [
     "如何评价远程办公？",
     "如何评价中山大学？",
     "和室友一起生活怎么样？",
     "想了解相机摄影",
   ]) {
-    const session = start(question);
+    const session = await start(question);
     assert.equal(session.stage, "clarifying", question);
     assert.deepEqual(session.clarification?.fields, ["purpose"]);
     assert.deepEqual(session.confirmed_context, { priorities: [] });
   }
 });
 
-test("clear questions and explicit priorities skip clarification", () => {
+test("clear questions and explicit priorities skip clarification", async () => {
   for (const question of [
     "远程办公的实际体验怎么样？",
     "北京在哪个城市圈？直接回答",
@@ -85,29 +86,29 @@ test("clear questions and explicit priorities skip clarification", () => {
     "预算 6000 元，想买一台旅行相机",
     "先整体介绍一下中山大学，不要追问",
   ]) {
-    assert.equal(createSession(question, owner).auto_answer, true, question);
+    assert.equal((await createSession(question, owner)).auto_answer, true, question);
   }
   assert.deepEqual(extractContext("预算 6000 元，想买一台旅行相机"), {
     priorities: ["成本与投入"],
   });
 });
 
-test("two generic rounds retain scenario and limit search to two focused queries", () => {
-  const initial = start("如何评价远程办公？");
-  const first = clarify(initial.session_id, owner, {
+test("two generic rounds retain scenario and limit search to two focused queries", async () => {
+  const initial = await start("如何评价远程办公？");
+  const first = (await clarify(initial.session_id, owner, {
     context_version: 1,
     selections: { purpose: "decide" },
     skip: false,
-  }).session;
+  })).session;
   assert.deepEqual(first.clarification?.fields, ["scenario", "priorities"]);
-  const final = clarify(initial.session_id, owner, {
+  const final = (await clarify(initial.session_id, owner, {
     context_version: 2,
     selections: {
       scenario: "工作三年，准备换工作",
       priorities: ["实际体验", "长期影响"],
     },
     skip: false,
-  }).session;
+  })).session;
   assert.equal(final.clarification_count, 2);
   assert.equal(final.stage, "ready");
   assert.equal(final.clarification, undefined);
@@ -115,10 +116,10 @@ test("two generic rounds retain scenario and limit search to two focused queries
   assert.ok(buildQueries(final).every((query) => query.includes("准备换工作")));
 });
 
-test("skip or overview immediately authorizes an answer", () => {
+test("skip or overview immediately authorizes an answer", async () => {
   for (const selections of [{}, { purpose: "overview" as const }]) {
-    const session = start("如何评价远程办公？");
-    const result = clarify(session.session_id, owner, {
+    const session = await start("如何评价远程办公？");
+    const result = await clarify(session.session_id, owner, {
       context_version: 1,
       selections,
       skip: !Object.keys(selections).length,
@@ -128,9 +129,9 @@ test("skip or overview immediately authorizes an answer", () => {
   }
 });
 
-test("unclassified free text reaches both search and generation without another question", () => {
-  const initial = start("如何评价远程办公？");
-  const result = clarify(initial.session_id, owner, {
+test("unclassified free text reaches both search and generation without another question", async () => {
+  const initial = await start("如何评价远程办公？");
+  const result = await clarify(initial.session_id, owner, {
     context_version: 1,
     selections: {},
     free_text: "我需要照顾家人，希望能灵活安排",
@@ -143,7 +144,7 @@ test("unclassified free text reaches both search and generation without another 
   );
 });
 
-test("generic conditions are editable and nullable without domain-specific cleanup", () => {
+test("generic conditions are editable and nullable without domain-specific cleanup", async () => {
   const next = mergeContext(
     {
       topic: "相机",
@@ -159,7 +160,7 @@ test("generic conditions are editable and nullable without domain-specific clean
   assert.equal(next.topic, "相机");
 });
 
-test("server validation rejects too many choices, state injection, and oversized questions", () => {
+test("server validation rejects too many choices, state injection, and oversized questions", async () => {
   assert.equal(
     contextSchema.safeParse({ priorities: ["a", "b", "c"] }).success,
     false,
@@ -181,8 +182,8 @@ test("server validation rejects too many choices, state injection, and oversized
   );
 });
 
-test("anonymous credentials are required in addition to the session ID", () => {
-  const session = start();
+test("anonymous credentials are required in addition to the session ID", async () => {
+  const session = await start();
   assert.throws(
     () => getSession(session.session_id, "another-browser"),
     (e: unknown) => e instanceof AppError && e.status === 404,
@@ -193,7 +194,7 @@ test("anonymous credentials are required in addition to the session ID", () => {
   );
 });
 
-test("A10: URL deduplication preserves original attribution and rejects unsafe links", () => {
+test("A10: URL deduplication preserves original attribution and rejects unsafe links", async () => {
   const results = deduplicate([
     source,
     {
@@ -208,7 +209,7 @@ test("A10: URL deduplication preserves original attribution and rejects unsafe l
   assert.equal(results[0].id, 1);
 });
 
-test("A10/A12: malformed or unknown model citations are not accepted", () => {
+test("A10/A12: malformed or unknown model citations are not accepted", async () => {
   assert.equal(parseDraft("not valid JSON", [source]), undefined);
   assert.equal(
     parseDraft(JSON.stringify({ ...draft, summary_citations: [999] }), [
@@ -220,7 +221,7 @@ test("A10/A12: malformed or unknown model citations are not accepted", () => {
 });
 
 test("A13: same or different request IDs cannot start duplicate generation", async () => {
-  const session = start();
+  const session = await start();
   const id = randomUUID();
   assert.equal(claimAnswer(session.session_id, owner, 1, id).start, true);
   assert.equal(claimAnswer(session.session_id, owner, 1, id).start, false);
@@ -259,7 +260,7 @@ test("A13: same or different request IDs cannot start duplicate generation", asy
 });
 
 test("A14: a late answer cannot overwrite changed conditions", async () => {
-  const session = start();
+  const session = await start();
   const request = randomUUID();
   claimAnswer(session.session_id, owner, 1, request);
   let release!: (draft: Draft) => void;
@@ -294,7 +295,7 @@ test("A14: a late answer cannot overwrite changed conditions", async () => {
 });
 
 test("old completed answers remain available after a context edit", async () => {
-  const session = start();
+  const session = await start();
   const request = randomUUID();
   claimAnswer(session.session_id, owner, 1, request);
   await runAnswer(session.session_id, 1, request, provider);
@@ -308,7 +309,7 @@ test("old completed answers remain available after a context edit", async () => 
 });
 
 test("A11: empty results allow only one simplified search, then honest guidance", async () => {
-  const session = start();
+  const session = await start();
   const request = randomUUID();
   let searches = 0;
   let generations = 0;
@@ -332,7 +333,7 @@ test("A11: empty results allow only one simplified search, then honest guidance"
 
 test("rate limit and invalid credentials stop calls without turning into empty results", async () => {
   for (const code of ["RATE_LIMITED", "AUTH_INVALID", "TIMEOUT"]) {
-    const session = start();
+    const session = await start();
     const request = randomUUID();
     let calls = 0;
     claimAnswer(session.session_id, owner, 1, request);
@@ -398,8 +399,8 @@ test("provider sends documented headers and preserves only valid returned dates"
   }
 });
 
-test("expired sessions and their feedback/request records are removed", () => {
-  const session = start();
+test("expired sessions and their feedback/request records are removed", async () => {
+  const session = await start();
   db()
     .prepare("UPDATE sessions SET expires = 0 WHERE id = ?")
     .run(session.session_id);
@@ -429,7 +430,7 @@ test("provider recognizes business errors even when Data is null", async () => {
 });
 
 test("price questions keep the two-query plan and at most one empty-result retry", async () => {
-  const session = start("预算有限，想了解相机的价格和长期使用体验");
+  const session = await start("预算有限，想了解相机的价格和长期使用体验");
   const request = randomUUID();
   const calls: string[] = [];
   claimAnswer(session.session_id, owner, 1, request);
@@ -499,7 +500,7 @@ test("the provider only searches Zhihu and filters non-post results while preser
   }
 });
 
-test("post URLs reject redirects, look-alike domains, credentials, and non-post pages", () => {
+test("post URLs reject redirects, look-alike domains, credentials, and non-post pages", async () => {
   for (const url of [
     "https://zhihu.com/question/12/",
     source.url,
@@ -524,7 +525,7 @@ test("post URLs reject redirects, look-alike domains, credentials, and non-post 
 
 test("runtime filters injected external sources before generation and text output lists posts first", async () => {
   const { presentAgentReply } = await import("../src/lib/agent/bridge");
-  const session = start();
+  const session = await start();
   const request = randomUUID();
   claimAnswer(session.session_id, owner, 1, request);
   await runAnswer(session.session_id, 1, request, {
@@ -638,8 +639,8 @@ test("text-only agent honors skipping without imposing required form fields", as
   assert.equal(reply.stage, "completed");
 });
 
-test("long questions preserve the latest supplement within the search budget", () => {
-  const session = start("如何评价远程办公？" + "背景".repeat(900));
+test("long questions preserve the latest supplement within the search budget", async () => {
+  const session = await start("如何评价远程办公？" + "背景".repeat(900));
   const updated = updateContext(session.session_id, owner, {
     context_version: 1,
     changes: { constraints: "周末无法工作" },
@@ -656,8 +657,8 @@ test("long questions preserve the latest supplement within the search budget", (
   );
 });
 
-test("legacy session data is preserved but rejected instead of misinterpreted", () => {
-  const session = start();
+test("legacy session data is preserved but rejected instead of misinterpreted", async () => {
+  const session = await start();
   const old = { ...session, schema_version: undefined };
   db()
     .prepare("UPDATE sessions SET data = ? WHERE id = ?")
@@ -683,7 +684,7 @@ test("documented Zhida text response is shown without assigning retrieved citati
   assert.equal(text?.summary_citations.length, 0);
   assert.ok(text?.sections.every((section) => section.citations.length === 0));
   assert.match(text!.limitations.join(""), /不能视为正文每项结论的证据/);
-  const session = start();
+  const session = await start();
   const request = randomUUID();
   claimAnswer(session.session_id, owner, 1, request);
   await runAnswer(session.session_id, 1, request, {
@@ -716,7 +717,7 @@ test("sources mode never calls the exhausted generation endpoint", async () => {
     globalThis.fetch = async () => {
       throw new Error("No upstream call allowed");
     };
-    const result = await new ZhihuProvider().generate(start(), [source]);
+    const result = await new ZhihuProvider().generate(await start(), [source]);
     assert.equal(result.format, "source_excerpts");
     assert.deepEqual(result.sections[0].citations, [source.id]);
   } finally {
@@ -727,7 +728,7 @@ test("sources mode never calls the exhausted generation endpoint", async () => {
 });
 
 test("generation quota errors retain actual sources and never retry generation", async () => {
-  const session = start();
+  const session = await start();
   const request = randomUUID();
   let calls = 0;
   claimAnswer(session.session_id, owner, 1, request);

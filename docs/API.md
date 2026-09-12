@@ -6,12 +6,16 @@
 | --------------------------------------- | -------------------------------------------------- | ---------------------------------------------- |
 | `POST /api/sessions`                    | `{question}`                                       | 201 `{session, auto_answer}` 并设置匿名 Cookie |
 | `GET /api/sessions/:id`                 | 无                                                 | 200 `{session}`                                |
-| `POST /api/sessions/:id/clarifications` | `{context_version, selections, free_text?, skip?}` | 200 `{session, auto_answer}`                   |
+| `POST /api/sessions/:id/clarifications` | `{context_version, selections?, answer?, free_text?, skip?}` | 200 `{session, auto_answer}`                   |
 | `PATCH /api/sessions/:id/context`       | `{context_version, changes, free_text?}`           | 200 `{session}`，新版本 ready                  |
 | `POST /api/sessions/:id/answer`         | `{context_version, request_id}`                    | 202 `{session}`，通过 GET 查询进度             |
 | `POST /api/sessions/:id/feedback`       | `{answer_id, type, reason?}`                       | 200 `{received:true}`                          |
 
-`question` 去除首尾空白后 1–2000 字符，单个补充最多 2000 字符，会话补充累计最多 8000 字符。关注点最多两项，字段选择只允许当前卡片提供的字段。`changes` 可编辑所有条件字段，传 `null` 清除可选字段。`purpose`：`understand`、`decide`、`solve`、`overview`；`priorities` 为字符串数组。
+`question` 去除首尾空白后 1–2000 字符，单个补充最多 2000 字符，会话补充累计最多 16000 字符（包括追问文本，容纳 5 轮）。关注点最多两项，字段选择只允许当前卡片提供的字段。`changes` 可编辑所有条件字段，传 `null` 清除可选字段。`purpose`：`understand`、`decide`、`solve`、`overview`；`priorities` 为字符串数组。
+
+动态卡片为 `clarification.kind=contextual`，`title` 是具体追问，`description` 是简短说明，`options` 是 0–5 项单选文本，`placeholder` 是输入提示，`fields=[]`。提交 `answer` 时必须与当前卡片中的选项完全一致（最多 120 字符）；也可只提交 `free_text` 或两者一起提交。`clarification_history` 保存实际问题和用户回答，不将模型问题提取为用户事实。旧 `purpose/details` 卡片仍支持原 `selections` 协议。
+
+最多 5 轮追问，信息足够、明确跳过或达到上限时返回 `ready`；动态卡片结束后 `auto_answer=true`。模型 HTTP/JSON 失败不推进版本和轮次，客户端可重试原输入或跳过；`CLARIFICATION_AUTH/LIMIT/INVALID/UNAVAILABLE` 分别表示密钥、额度、格式、连接问题。模型请求在事务外执行，落库前重新核对版本。不要自动重放创建/追问请求。
 
 `request_id` 是客户端生成的 UUID。重复 ID 返回当前会话，不重复调用。相同会话在生成中使用不同 ID 也不启动第二个任务。同版本已有答案时直接复用；失败后的手动重试需要新 ID。旧 `context_version` 返回 409，不自动迁移请求。
 
@@ -43,7 +47,7 @@ Context: topic（讨论对象，最多 100 字符）、purpose、scenario（场�
 
 POST /api/agent/messages 接收 message（1–2000 字符）、request_id（UUID），继续对话时同时带 session_id（UUID）与 context_version（正整数）。身份仍由 HttpOnly Cookie 确定，不接受客户端提交 ownerToken。
 
-返回 session_id、context_version、stage、text、provider，以及可选 clarification 和 answer。宽泛问题返回追问；清晰问题或完成补充后自动生成。对目的卡片可直接回复自然语言，也可回复选项全文或 1–4；不强制结构化表单。
+返回 session_id、context_version、stage、text、provider，以及可选 clarification 和 answer。宽泛问题返回追问；清晰问题或完成补充后自动生成。可直接回复自然语言、当前选项全文或对应编号；动态卡片会将编号解析为选项文本，不强制结构化表单。
 
 本接口等待处理完成，当前没有流式输出。发生断线时先 GET /api/sessions/:id 检查是否仍在生成。后续消息携带旧版本会返回 409；首次消息创建暂不提供宿主事件级幂等。不要将此调试协议直接注册为未经确认的知乎 webhook。
 

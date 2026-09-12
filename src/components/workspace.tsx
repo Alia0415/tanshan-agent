@@ -22,7 +22,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import type { Context, ContextPatch, Session } from "@/lib/domain/types";
+import { MAX_CLARIFICATION_ROUNDS, type Context, type ContextPatch, type Session } from "@/lib/domain/types";
 import { ContextFields, ContextTags } from "./context-fields";
 import { AnswerCard } from "./answer-card";
 
@@ -67,7 +67,7 @@ async function api<T>(
     method,
     credentials: "same-origin",
     cache: "no-store",
-    signal: AbortSignal.timeout(20000),
+    signal: AbortSignal.timeout(method === "POST" ? 45000 : 20000),
     ...(payload
       ? {
           headers: { "Content-Type": "application/json" },
@@ -97,6 +97,7 @@ export function Workspace() {
   const [question, setQuestion] = useState("");
   const [context, setContext] = useState<Context>(emptyContext);
   const [freeText, setFreeText] = useState("");
+  const [clarificationAnswer, setClarificationAnswer] = useState("");
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
   const [restoring, setRestoring] = useState(true);
@@ -126,6 +127,7 @@ export function Workspace() {
   }
 
   function apply(next: Session) {
+    setClarificationAnswer("");
     setSession((previous) =>
       previous &&
       previous.session_id === next.session_id &&
@@ -286,7 +288,7 @@ export function Workspace() {
     for (const field of session.clarification.fields)
       if (context[field] !== undefined)
         Object.assign(selections, { [field]: context[field] });
-    void run("正在整理你的条件", async (ticket) =>
+    void run(skip ? "正在准备回答" : "正在判断是否还需要补充", async (ticket) =>
       accept(
         await api<Result>(
           `/api/sessions/${session.session_id}/clarifications`,
@@ -294,6 +296,7 @@ export function Workspace() {
           {
             context_version: session.context_version,
             selections,
+            ...(clarificationAnswer ? { answer: clarificationAnswer } : {}),
             free_text: freeText,
             skip,
           },
@@ -338,6 +341,7 @@ export function Workspace() {
     setContext(emptyContext());
     setFreeText("");
     setEditing(false);
+    setClarificationAnswer("");
     setNotice("");
     setConnectionLost(false);
     remember();
@@ -619,7 +623,7 @@ export function Workspace() {
               <div className="home-principles">
                 <span>
                   <MessageCircle size={15} />
-                  最多两轮追问
+                  最多 {MAX_CLARIFICATION_ROUNDS} 轮追问
                 </span>
                 <span>
                   <Check size={15} />
@@ -728,19 +732,34 @@ export function Workspace() {
                     </span>
                     <span className="eyebrow">问山想再了解一点</span>
                     <span className="round-count">
-                      第 {session.clarification_count + 1} / 2 轮
+                      第 {session.clarification_count + 1} / {MAX_CLARIFICATION_ROUNDS} 轮
                     </span>
                   </div>
                   <h2>{session.clarification.title}</h2>
                   <p className="panel-description">
                     {session.clarification.description}
                   </p>
-                  <ContextFields
-                    value={context}
-                    onChange={setContext}
-                    fields={session.clarification.fields}
-                    disabled={Boolean(busy)}
-                  />
+                  {session.clarification.kind === "contextual" ? (
+                    Boolean(session.clarification.options?.length) && (
+                      <fieldset disabled={Boolean(busy)}>
+                        <legend className="sr-only">选择最符合你的情况的一项，也可以自由补充</legend>
+                        <div className="chips">
+                          {session.clarification.options?.map((option) => (
+                            <button type="button" key={option}
+                              className={`chip ${clarificationAnswer === option ? "selected" : ""}`}
+                              aria-pressed={clarificationAnswer === option}
+                              onClick={() => setClarificationAnswer(clarificationAnswer === option ? "" : option)}>
+                              {clarificationAnswer === option && <Check size={13} />}
+                              {option}
+                            </button>
+                          ))}
+                        </div>
+                      </fieldset>
+                    )
+                  ) : (
+                    <ContextFields value={context} onChange={setContext}
+                      fields={session.clarification.fields} disabled={Boolean(busy)} />
+                  )}
                   <label className="field-label supplement">
                     也可以直接说说你的想法<span className="muted">选填</span>
                     <textarea
@@ -748,7 +767,7 @@ export function Workspace() {
                       onChange={(event) => setFreeText(event.target.value)}
                       disabled={Boolean(busy)}
                       maxLength={2000}
-                      placeholder="不在选项里？在这里自由补充…"
+                      placeholder={session.clarification.placeholder || "不在选项里？在这里自由补充…"}
                     />
                   </label>
                   <div className="panel-actions">
@@ -765,7 +784,7 @@ export function Workspace() {
                       type="button"
                       className="primary"
                       onClick={() => submitClarification(false)}
-                      disabled={Boolean(busy)}
+                      disabled={Boolean(busy) || (session.clarification.kind === "contextual" && !clarificationAnswer && !freeText.trim())}
                     >
                       {busy ? (
                         <LoaderCircle className="spin" size={16} />
@@ -775,6 +794,7 @@ export function Workspace() {
                       <ArrowRight size={16} />
                     </button>
                   </div>
+                  {busy && <p className="loading-caption" role="status">{busy}…</p>}
                 </section>
               ) : session.stage === "ready" ? (
                 <section className="panel ready-panel">
@@ -947,7 +967,7 @@ export function Workspace() {
             </span>
             <h2 id="about-title">多问一句，答案更近一步。</h2>
             <p>
-              问山从你的目的出发，用最多两轮、可随时跳过的追问，把工作、消费、生活、学习等问题变得更清晰。
+              问山根据你的具体问题和补充，判断还需要了解什么。最多追问 {MAX_CLARIFICATION_ROUNDS} 轮，信息足够就开始回答，也可以随时跳过。
             </p>
             <p>
               连接真实资料后，每次回答会展示可检查的来源。演示模式仅展示交互与一般性分析框架。

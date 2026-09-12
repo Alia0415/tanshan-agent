@@ -8,7 +8,7 @@
 
 - `agent/`：Agent 人设、开场白、示例问题和知乎 Skill 工具映射。
 - `src/lib/agent/`：共享指令与文字消息处理入口，不依赖浏览器 DOM、表单或 Next.js。
-- `src/lib/domain/`：通用目的、背景、限制与关注点；最多两轮可跳过追问。
+- `src/lib/domain/`：通用目的、背景、限制与关注点；最多 5 轮可跳过追问。
 - `src/lib/server/`：会话、身份隔离、版本与生成幂等；知乎帖子搜索、知乎直答适配。
 - `src/app/`：本地调试页面和应用 HTTP 接口，方便验证 Agent 的行为。
 
@@ -30,7 +30,13 @@ Copy-Item .env.example .env.local
 npm run dev
 ```
 
-打开 [本地调试入口](http://localhost:3000)。默认 `WENSHAN_PROVIDER=demo`，不发起外部 API 请求，不生成虚构来源。
+打开 [本地调试入口](http://localhost:3000)。默认 `WENSHAN_PROVIDER=demo`，不查询真实知乎资料，不生成虚构来源。追问独立配置：未填 DeepSeek 密钥时使用本地规则演示，填入后自动启用模型追问。
+
+在 `.env.local` 添加 `DEEPSEEK_API_KEY=自己的密钥` 即可启用动态追问。默认模型为 `deepseek-flash`，可用 `DEEPSEEK_MODEL` 覆盖。模型根据原问题、补充和历轮问答，每轮生成一个具体问题和可选回答；每轮重新判断，信息足够就自动开始回答，最多 5 轮，可随时跳过。选项和自由补充连同所回答的问题进入后续检索和总结。密钥只在服务端读取。
+
+`WENSHAN_CLARIFICATION_MODE=auto` 自动根据密钥选择；`deepseek` 强制使用模型并要求密钥；`local` 强制本地规则演示。完全离线的演示/HTTP smoke 应同时设置 `WENSHAN_PROVIDER=demo` 和 `WENSHAN_CLARIFICATION_MODE=local`。模型失败会显示可重试的错误，保留原卡片和输入，不冒充动态追问、不自动重试付费请求；仍可跳过已有追问。
+
+接入依据：[DeepSeek JSON 输出](https://api-docs.deepseek.com/guides/json_mode/)与[对话接口](https://api-docs.deepseek.com/api/create-chat-completion/)。使用原生 fetch、非思考模式和结构校验，服务端超时 30 秒，页面提交等待 45 秒。
 
 启用真实资料时在 `.env.local` 设置：
 
@@ -52,6 +58,7 @@ ZHIHU_GENERATION_MODE=auto
 | ---------------------- | ------------------------------------------------------------------------------------------ |
 | `npm run agent:export` | 从共享定义导出可阅读的人设与开场白                                                         |
 | `npm run test:zhihu`   | 显式真实联调：一次知乎搜索与一次直答；sources 模式跳过直答，消耗业务额度，不在 CI 自动执行 |
+| `npm run test:clarification` | 显式 DeepSeek 联调：工作、相机、室友、事实题和一次补充，最多 5 次模型请求，消耗 API 额度，不在 CI 自动执行 |
 | `npm run check`        | 代码规范、类型检查和受控测试                                                               |
 | `npm run build`        | 生产构建                                                                                   |
 | `npm start`            | 启动调试服务的生产版本                                                                     |
@@ -72,4 +79,4 @@ docker build -t wenshan-agent .
 docker run -d --name wenshan -p 3000:3000 --env-file .env.local -v wenshan-data:/app/.data wenshan-agent
 ```
 
-生产 Cookie 使用 Secure，HTTP 路由应置于 HTTPS 反向代理之后。原型尚未提供通用模型意图识别、逐字流式输出或站内发布集成。
+生产 Cookie 使用 Secure，HTTP 路由应置于 HTTPS 反向代理之后。模型规划已用于追问决策；尚未提供逐字流式输出或站内发布集成。

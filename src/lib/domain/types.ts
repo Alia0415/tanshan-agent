@@ -1,3 +1,4 @@
+export const MAX_CLARIFICATION_ROUNDS = 5;
 export const PURPOSES = {
   understand: "了解与判断",
   decide: "比较与选择",
@@ -21,10 +22,12 @@ export interface Context {
   constraints?: string;
 }
 export interface ClarificationCard {
-  kind: "purpose" | "details";
+  kind: "purpose" | "details" | "contextual";
   title: string;
   description: string;
   fields: ("purpose" | "scenario" | "constraints" | "priorities")[];
+  options?: string[];
+  placeholder?: string;
 }
 export interface Source {
   id: number;
@@ -68,6 +71,7 @@ export interface Session {
   free_text_context: string[];
   focused_question: string;
   clarification?: ClarificationCard;
+  clarification_history?: { question: string; answer: string }[];
   answers: Answer[];
   provider: "demo" | "live";
   created_at: string;
