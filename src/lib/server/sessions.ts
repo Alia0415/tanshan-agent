@@ -14,7 +14,7 @@ import {
   mergeContext,
 } from "../domain/clarification";
 import { planClarification, type ClarificationPlanner } from "./clarification-planner";
-import { filterZhihuPosts } from "../domain/sources";
+import { retrieve } from "./retrieval";
 import {
   checkVersion,
   db,
@@ -24,7 +24,6 @@ import {
   transaction,
 } from "./store";
 import {
-  deduplicate,
   guidance,
   sourceDraft,
   ZhihuProvider,
@@ -264,59 +263,16 @@ export async function runAnswer(
   try {
     let session = isCurrent();
     if (!session) return;
-    const queries = buildQueries(session);
+    let queries = buildQueries(session);
+    let searchInfo;
     const warnings: string[] = [];
     let sources: Awaited<ReturnType<KnowledgeProvider["search"]>> = [];
-    let successfulSearches = 0;
     if (session.provider === "live") {
-      let lastError: unknown;
-      for (const query of queries) {
-        if (!isCurrent()) return;
-        try {
-          sources.push(...filterZhihuPosts(await provider.search(query)));
-          successfulSearches += 1;
-        } catch (error) {
-          if (
-            error instanceof AppError &&
-            ["AUTH_REQUIRED", "AUTH_INVALID", "RATE_LIMITED"].includes(
-              error.code,
-            )
-          )
-            throw error;
-          warnings.push("部分资料未能获取，本次回答仅覆盖已返回内容。");
-          lastError = error;
-        }
-      }
-      if (!successfulSearches)
-        throw (
-          lastError ||
-          new AppError("SEARCH_FAILED", "本次未能完成搜索，请稍后重试。", 502)
-        );
-      // One simplified retry, only for genuinely empty results; total query budget <= 3.
-      if (!sources.length && queries.length < 3) {
-        const simplified =
-          session.confirmed_context.topic ||
-          session.original_question.slice(0, 80);
-        if (!queries.includes(simplified)) {
-          queries.push(simplified);
-          if (!isCurrent()) return;
-          try {
-            sources.push(
-              ...filterZhihuPosts(await provider.search(simplified)),
-            );
-          } catch (error) {
-            if (
-              error instanceof AppError &&
-              ["AUTH_REQUIRED", "AUTH_INVALID", "RATE_LIMITED"].includes(
-                error.code,
-              )
-            )
-              throw error;
-            warnings.push("简化关键词后仍未获取到更多资料。");
-          }
-        }
-      }
-      sources = deduplicate(sources);
+      const result = await retrieve(session, provider, () => Boolean(isCurrent()));
+      sources = result.sources;
+      queries = result.queries;
+      warnings.push(...result.warnings);
+      searchInfo = result.info;
     } else {
       await new Promise((resolve) => setTimeout(resolve, 450));
     }
@@ -352,6 +308,7 @@ export async function runAnswer(
       focused_question: session.focused_question,
       sources,
       queries,
+      search_info: searchInfo,
       evidence:
         session.provider === "demo"
           ? "demo"

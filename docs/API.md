@@ -58,3 +58,13 @@ POST /api/agent/messages 接收 message（1–2000 字符）、request_id（UUID
 answer.sources 只包含知乎问题、回答和专栏文章，URL 为知乎原帖地址。title、author、excerpt 来自知乎搜索，其中 excerpt 是搜索摘要，不是帖子全文。卡片和 text 结果先展示帖子列表；卡片的 AI 辅助总结默认折叠。旧会话数据不改写，展示时过滤历史站外资料，并隐藏依赖这些资料的旧总结。
 
 answer.format 可为 structured（引用编号已校验）、zhida_text（知乎直答普通文本，无逐条引用）或 source_excerpts（检索原始摘要）。普通文本的 evidence 为 unverified，相关检索资料不能当作正文证据。ZHIHU_GENERATION_MODE=sources 可在额度不足时完全跳过生成调用。
+
+## 检索质量信息
+
+新回答可包含 `search_info`：`strategy` 为 semantic/basic/fallback，`candidate_count` 为去重后的候选数，`selected_count` 为最终展示数，`reviewed` 表示完成过模型筛选，`expanded` 表示使用过备用查询。`queries` 记录真正执行的查询，最多 3 条。结果最多展示 5 篇，数量少于 5 不表示请求失败。
+
+筛选后的 Source 可包含 `relevance={reason,evidence,caveat?,match_level?}`。reason 是 AI 的相关性解释，evidence 必须为该来源标题或摘要中的连续原文，caveat 提醒尚未确认的条件；这些字段不增加事实证据。原始 `excerpt`、作者、链接不改写，页面优先展示 evidence 附近的原始摘要片段。编号在筛选后重新连续分配，再传给回答生成器。旧答案缺少这些可选字段仍可读取。
+
+Source 可选 `comment_count`（评论数）、`vote_up_count`（赞同数），来自知乎响应的 `CommentCount` / `VoteUpCount`。非负安全整数才保留，0 是有效值，缺失/null/非法数值留空，不由模型估算。`updated_at` 来自 `EditTime`，不保证为首次发布时间。评论、赞同与更新日期会在卡片及文字回复展示；仅在相关性和条件匹配度相同的层级内用于综合排序。排序完成后再截取最多 5 篇和分配引用编号。
+
+规划/筛选失败时 `strategy=fallback`，在页面和文字回复中提示候选资料仍需核对。筛选成功时，只有通过筛选的帖子进入生成；筛选后无相关内容则返回资料不足，不用被淘汰的帖子填充。模型不可用时保留候选资料并明确降级状态。模型推理期间修改条件会取消旧任务后续步骤。回答接口与文字入口的执行预算为 300 秒。

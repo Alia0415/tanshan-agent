@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { PURPOSES, type Session, type Purpose } from "../domain/types";
 import { AppError } from "../domain/validation";
-import { filterZhihuPosts } from "../domain/sources";
+import { filterZhihuPosts, sourceSignals } from "../domain/sources";
 import {
   createSession,
   clarify,
@@ -54,7 +54,7 @@ export function presentAgentReply(session: Session) {
         : "本次没有检索到真实知乎帖子。",
       ...posts.map(
         (source) =>
-          `[${source.id}] ${source.title} — ${source.author || "作者未提供"}（知乎）\n${source.excerpt}\n${source.url}`,
+          `[${source.id}] ${source.title} — ${source.author || "作者未提供"}（知乎）${sourceSignals(source) ? `\n${sourceSignals(source)}` : ""}\n${source.excerpt}${source.relevance ? `\nAI 筛选说明：${source.relevance.reason}${source.relevance.caveat ? ` ${source.relevance.caveat}` : ""}` : ""}\n${source.url}`,
       ),
       ...(posts.length !== answer.sources.length
         ? ["历史回答含有站外资料，旧总结已隐藏。新建提问将只检索知乎帖子。"]
@@ -72,6 +72,8 @@ export function presentAgentReply(session: Session) {
             ...answer.limitations,
           ]),
     ].join("\n\n");
+    if (answer.search_info?.strategy === "fallback")
+      text = "本次检索优化未全部完成，候选资料是否适用仍需核对。\n\n" + text;
   } else if (session.error) text = session.error.message;
   else text = "正在结合你的条件检索和整理资料。";
   return {

@@ -12,7 +12,7 @@ export interface Draft {
   limitations: string[];
 }
 export interface KnowledgeProvider {
-  search(query: string): Promise<Source[]>;
+  search(query: string, count?: number): Promise<Source[]>;
   generate(session: Session, sources: Source[]): Promise<Draft>;
 }
 
@@ -51,6 +51,8 @@ export function deduplicate(sources: Source[]): Source[] {
     .map((source, index) => ({ ...source, id: index + 1 }));
 }
 
+// Optional metadata must not invalidate an otherwise usable post or invent zero counts.
+const interactionCount = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional().catch(undefined);
 const itemSchema = z.object({
   Title: z.string(),
   ContentType: z.string(),
@@ -58,7 +60,9 @@ const itemSchema = z.object({
   ContentText: z.string(),
   Url: z.string(),
   AuthorName: z.string(),
-  EditTime: z.number().optional(),
+  EditTime: z.number().int().nonnegative().optional().catch(undefined),
+  CommentCount: interactionCount,
+  VoteUpCount: interactionCount,
 });
 const responseSchema = z.object({
   Code: z.number(),
@@ -251,12 +255,12 @@ export function parseTextDraft(content: string): Draft | undefined {
 }
 
 export class ZhihuProvider implements KnowledgeProvider {
-  async search(query: string): Promise<Source[]> {
+  async search(query: string, count = 5): Promise<Source[]> {
     const url = new URL(
       "https://developer.zhihu.com/api/v1/content/zhihu_search",
     );
     url.searchParams.set("Query", query);
-    url.searchParams.set("Count", "5");
+    url.searchParams.set("Count", String(Number.isFinite(count) ? Math.min(10, Math.max(1, Math.floor(count))) : 5));
     const result = responseSchema.safeParse(await request(url.href));
     if (!result.success)
       throw new AppError("INVALID_RESPONSE", "搜索结果格式暂时无法读取。", 502);
@@ -288,6 +292,8 @@ export class ZhihuProvider implements KnowledgeProvider {
       type: item.ContentType,
       excerpt: plainText(item.ContentText).slice(0, 5000),
       url: item.Url,
+      ...(item.CommentCount !== undefined ? { comment_count: item.CommentCount } : {}),
+      ...(item.VoteUpCount !== undefined ? { vote_up_count: item.VoteUpCount } : {}),
       ...(item.EditTime &&
       item.EditTime > 0 &&
       item.EditTime * 1000 <= Date.now()
@@ -332,6 +338,7 @@ export class ZhihuProvider implements KnowledgeProvider {
                       channel,
                       updated_at,
                       url,
+                      relevance,
                     }) => ({
                       id,
                       title,
@@ -340,6 +347,7 @@ export class ZhihuProvider implements KnowledgeProvider {
                       channel,
                       updated_at,
                       url,
+                      relevance,
                     }),
                   ),
                 },

@@ -3,7 +3,7 @@ import { answerSchema } from "@/lib/domain/validation";
 import { body, handle, identity, type RouteContext } from "@/lib/server/http";
 import { claimAnswer, runAnswer } from "@/lib/server/sessions";
 export const runtime = "nodejs";
-export const maxDuration = 240;
+export const maxDuration = 300;
 export async function POST(request: Request, context: RouteContext) {
   return handle(async () => {
     const { id } = await context.params;

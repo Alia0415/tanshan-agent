@@ -38,7 +38,17 @@ export interface Source {
   excerpt: string;
   url: string;
   updated_at?: string;
+  comment_count?: number;
+  vote_up_count?: number;
   channel?: "zhihu" | "global";
+  relevance?: { reason: string; evidence: string; caveat?: string; match_level?: "direct" | "background" };
+}
+export interface SearchInfo {
+  strategy: "semantic" | "basic" | "fallback";
+  candidate_count: number;
+  selected_count: number;
+  reviewed: boolean;
+  expanded: boolean;
 }
 export interface AnswerSection {
   title: string;
@@ -57,6 +67,7 @@ export interface Answer {
   limitations: string[];
   sources: Source[];
   queries: string[];
+  search_info?: SearchInfo;
   evidence: "demo" | "sources" | "insufficient" | "unverified";
   created_at: string;
 }

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { MAX_CLARIFICATION_ROUNDS, type ClarificationCard, type Session } from "../domain/types";
 import { AppError } from "../domain/validation";
 import { nextCard } from "../domain/clarification";
+import { deepseekJson } from "./deepseek";
 
 export type ClarificationPlanner = (session: Session) => Promise<ClarificationCard | undefined>;
 
@@ -61,47 +62,17 @@ export const planClarification: ClarificationPlanner = async (session) => {
   if (!key)
     throw new AppError("CLARIFICATION_AUTH", "请在服务端配置 DeepSeek API Key 后重试。", 503);
 
-  let response: Response;
-  let result: unknown;
-  try {
-    response = await fetch("https://api.deepseek.com/chat/completions", {
-      method: "POST", cache: "no-store", signal: AbortSignal.timeout(30000),
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model: process.env.DEEPSEEK_MODEL?.trim() || "deepseek-flash",
-        thinking: { type: "disabled" }, stream: false, temperature: 0.3,
-        max_tokens: 900, response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: instructions },
-          { role: "user", content: JSON.stringify({
-            original_question: session.original_question,
-            confirmed_context: session.confirmed_context,
-            supplements: session.free_text_context,
-            history: session.clarification_history || [],
-            remaining_rounds: MAX_CLARIFICATION_ROUNDS - session.clarification_count,
-          }) },
-        ],
-      }),
-    });
-    // Never include raw upstream errors, headers or credentials in application errors.
-    if ([401, 403].includes(response.status))
-      throw new AppError("CLARIFICATION_AUTH", "DeepSeek 密钥未通过验证，请检查服务端配置。", 503);
-    if ([402, 429].includes(response.status))
-      throw new AppError("CLARIFICATION_LIMIT", "DeepSeek 余额或调用频率受限，请检查账户后重试。", 503);
-    if (!response.ok)
-      throw new AppError("CLARIFICATION_UNAVAILABLE", "追问服务暂不可用，请重试；也可以选择直接回答。", 502);
-    result = await response.json();
-  } catch (error) {
-    if (error instanceof AppError) throw error;
-    throw new AppError("CLARIFICATION_UNAVAILABLE", "追问服务连接中断或超时，请重试；也可以选择直接回答。", 502);
-  }
-  const completion = z.object({ choices: z.array(z.object({
-    finish_reason: z.literal("stop"),
-    message: z.object({ content: z.string().min(1).max(12000) }),
-  })).min(1) }).safeParse(result);
-  if (!completion.success)
-    throw new AppError("CLARIFICATION_INVALID", "这次追问没有完整生成，请重试；也可以选择直接回答。", 502);
-  const card = parseClarificationPlan(completion.data.choices[0].message.content);
+  const content = await deepseekJson({
+    feature: "CLARIFICATION", instructions, maxTokens: 900,
+    input: {
+      original_question: session.original_question,
+      confirmed_context: session.confirmed_context,
+      supplements: session.free_text_context,
+      history: session.clarification_history || [],
+      remaining_rounds: MAX_CLARIFICATION_ROUNDS - session.clarification_count,
+    },
+  });
+  const card = parseClarificationPlan(content);
   const normalize = (text: string) => text.replace(/[\s\p{P}]/gu, "");
   if (card && session.clarification_history?.some((turn) => normalize(turn.question) === normalize(card.title))) return;
   return card;

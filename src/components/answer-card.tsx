@@ -9,7 +9,7 @@ import {
   ThumbsUp,
 } from "lucide-react";
 import { useState } from "react";
-import { filterZhihuPosts } from "@/lib/domain/sources";
+import { filterZhihuPosts, previewExcerpt, sourceSignals } from "@/lib/domain/sources";
 import type { Answer } from "@/lib/domain/types";
 import { ContextTags } from "./context-fields";
 
@@ -92,7 +92,11 @@ export function AnswerCard({
           为你找到的知乎帖子 <span>{posts.length}</span>
         </h2>
         <p className="posts-hint">
-          点击帖子查看知乎原文；这里保留搜索返回的摘要。
+          {answer.search_info?.strategy === "fallback"
+            ? "本次检索优化未全部完成，候选帖子是否适用还需核对。"
+            : answer.search_info?.reviewed
+              ? "已结合你的问题和补充筛选，相关性相近时参考互动量与更新时间排序。相关性由 AI 根据摘要判断，具体信息请核对原文。"
+              : "点击帖子查看知乎原文；这里保留搜索返回的摘要。"}
         </p>
         {posts.length ? (
           posts.map((source) => (
@@ -114,12 +118,14 @@ export function AnswerCard({
                     : source.type.toLowerCase() === "article"
                       ? "文章"
                       : "问题"}
-                  {source.updated_at && ` · ${source.updated_at.slice(0, 10)}`}
+                  {sourceSignals(source) && ` · ${sourceSignals(source)}`}
                 </p>
                 <small>
-                  {source.excerpt.slice(0, 240)}
-                  {source.excerpt.length > 240 ? "…" : ""}
+                  {previewExcerpt(source)}
                 </small>
+                {source.relevance && (
+                  <p>筛选说明：{source.relevance.reason} {source.relevance.caveat}</p>
+                )}
               </div>
               <span className="post-open">
                 打开知乎原帖 <ArrowUpRight size={15} />

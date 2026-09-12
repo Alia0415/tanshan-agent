@@ -5,10 +5,8 @@ import Link from "next/link";
 import {
   ArrowDown,
   ArrowRight,
-  ArrowUp,
   BookOpen,
   Check,
-  ChevronRight,
   Compass,
   BriefcaseBusiness,
   Leaf,
@@ -448,14 +446,16 @@ export function Workspace() {
               <Mountain size={21} />
               问山
             </span>
-            <span className="desktop-crumb">问山</span>
-            <ChevronRight size={13} />
-            <span>{session ? "探索进行中" : "从好奇开始"}</span>
+            <Link className="header-brand" href="/">问山</Link>
+            <nav className="header-nav" aria-label="主导航">
+              <button type="button" className="nav-current" onClick={() => document.getElementById("main-content")?.scrollIntoView({ behavior: "smooth" })}>{session ? "当前提问" : "首页"}</button>
+              <button type="button" onClick={() => setAbout(true)}>关于问山</button>
+            </nav>
           </div>
           <div className="topbar-right">
             <span className="mode-badge">
               <span />
-              {session?.provider === "live" ? "真实接口模式" : "Agent 调试预览"}
+              {session?.provider === "live" ? "联网问答" : "体验模式"}
             </span>
             <button
               type="button"
@@ -488,12 +488,10 @@ export function Workspace() {
               <section className="hero">
                 <div className="hero-kicker">
                   <span />
-                  问山 Agent · 本地调试入口
+                  问山 · 智能问答
                 </div>
                 <h1>
-                  好问题，
-                  <br />
-                  值得<span>多问一句。</span>
+                  有问题，就会有答案
                 </h1>
                 <p>
                   先说说你想知道什么，
@@ -575,7 +573,7 @@ export function Workspace() {
                       {busy || restoring ? (
                         <LoaderCircle size={19} className="spin" />
                       ) : (
-                        <ArrowUp size={21} />
+                        <><Plus size={17} /> 提问</>
                       )}
                     </button>
                   </div>
@@ -588,9 +586,9 @@ export function Workspace() {
               )}
               <section className="examples">
                 <div className="section-heading">
-                  <span>还没想好？从这里开始</span>
+                  <span>为你推荐</span>
                   <span>
-                    一点灵感 <ArrowDown size={13} />
+                    选择一个问题，开始探索 <ArrowDown size={13} />
                   </span>
                 </div>
                 <div className="example-grid">

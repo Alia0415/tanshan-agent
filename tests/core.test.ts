@@ -41,6 +41,7 @@ process.env.WENSHAN_DB_PATH = join(
 );
 process.env.WENSHAN_PROVIDER = "live";
 process.env.WENSHAN_CLARIFICATION_MODE = "local";
+process.env.WENSHAN_SEARCH_MODE = "basic";
 const owner = "browser-owner";
 const source: Source = {
   id: 1,
