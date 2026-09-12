@@ -113,6 +113,7 @@ export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?
           {error}
         </p>
       )}
+      <div className="roundtable-live-layout">
       <RoomStage round={round ?? { roles: [], messages: [], scheduler: { state: "running", turn: 0 } }} visible={round?.messages.length ?? 0} playing={playing && !busy && round?.scheduler.state === "running"} scene={scene ?? (round?.scheduler.state === "complete" ? "night" : "morning")} onScene={setScene} onTurnEnd={() => void advanceOnce()} />
       {!round ? (
         <form
@@ -140,11 +141,12 @@ export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?
           </div>
         </form>
       ) : (
-        <>
-          <h2>{round.question}</h2>
+        <section className="roundtable-chat" aria-label="圆桌群聊">
+          <header className="roundtable-chat-header"><h2>圆桌群聊</h2><p>{round.question}</p><span>{round.roles.length} 位 Agent · {round.messages.length} 条消息</span></header>
           <div
             ref={listRef}
-            className="transcript"
+            className="transcript roundtable-chat-messages"
+            role="log" aria-label="群聊消息" aria-live="polite"
             style={{
               maxHeight: "60vh",
               overflowY: "auto",
@@ -156,6 +158,7 @@ export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?
           >
             {round.messages.map((message, index) => {
               const previous = round.messages[index - 1];
+              const parent = round.messages.find(item => item.id === message.replyTo);
               return (
                 <div key={message.id}>
                   {previous?.phase !== message.phase && (
@@ -169,6 +172,7 @@ export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?
                       justifyContent: message.speaker === "user" ? "flex-end" : "flex-start",
                     }}
                   >
+                    <span className={`chat-avatar${message.speaker === "user" ? " chat-avatar-self" : ""}`} aria-hidden="true">{nameOf(message.speaker).slice(0, 1)}</span>
                     <div
                       className="panel"
                       style={{
@@ -186,6 +190,7 @@ export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?
                           {nameOf(message.speaker)}
                         </div>
                       )}
+                      {parent && <blockquote className="chat-reply"><strong>{nameOf(parent.speaker)}：</strong>{parent.content.slice(0, 80)}{parent.content.length > 80 ? "…" : ""}</blockquote>}
                       {message.content}
                       {message.citations.length > 0 && (
                         <div style={{ fontSize: 10, opacity: 0.7, marginTop: 4 }}>
@@ -220,10 +225,11 @@ export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?
             style={{ display: "flex", gap: 10, marginTop: 10 }}
           >
             <input
+              aria-label="圆桌群聊发言"
               value={draft}
               maxLength={300}
               onChange={(event) => setDraft(event.target.value)}
-              placeholder="说一句话加入讨论，最相关的 Agent 会回应你"
+              placeholder="发言加入讨论…"
               disabled={Boolean(busy)}
               style={{ flex: 1 }}
             />
@@ -231,8 +237,9 @@ export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?
               <Send size={15} /> 发送
             </button>
           </form>
-        </>
+        </section>
       )}
+      </div>
       {busy && <p role="status" className="roundtable-status"><LoaderCircle size={16} className="spin" /> {busy}…</p>}
       {round && <section className="roundtable-summary"><h2>本场资料与结论</h2>{round.commonGround.length > 0 && <><h3>共识</h3><ul>{round.commonGround.map(item => <li key={item}>{item}</li>)}</ul></>}{round.disagreements.length > 0 && <><h3>分歧</h3><ul>{round.disagreements.map(item => <li key={item}>{item}</li>)}</ul></>}<details><summary>查看 {round.sources.length} 条真实来源</summary>{round.sources.map(source => <p key={source.id}><a href={source.url} target="_blank" rel="noreferrer">[{source.id}] {source.title}</a> · {source.author}</p>)}</details></section>}
     </main>

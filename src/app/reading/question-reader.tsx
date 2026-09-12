@@ -49,11 +49,6 @@ function RouteIcon() {
   );
 }
 
-function getIntentSummary(history: ReadingTurn[]) {
-  if (!history.length) return "你希望先快速了解这个问题的主要观点，不限定具体身份和方向。";
-  return history.map((turn) => `“${turn.answer}”`).join("，") + "。问山会据此安排阅读顺序，并保留其他重要观点。";
-}
-
 export default function QuestionReader({ question }: { question: Question }) {
   const assistantEnabled = Boolean(question.firstSeenHot);
   const [ordinary, setOrdinary] = useState<Array<{url: string; author: string; excerpt: string; votes: number}>>([]);
@@ -201,7 +196,7 @@ export default function QuestionReader({ question }: { question: Question }) {
                     return (
                       <button key={option.id} className={`option-button${selected ? " selected" : ""}`} type="button" role="radio" aria-checked={selected} onClick={() => setSelectedAnswer(option.label)}>
                         <span className="radio-dot" aria-hidden="true" />
-                        <span><strong>{option.label}</strong><small>{option.detail}</small></span>
+                        <span><strong>{option.label}</strong></span>
                       </button>
                     );
                   })}
@@ -216,7 +211,9 @@ export default function QuestionReader({ question }: { question: Question }) {
             {stage === "summary" && (
               <div className="summary-panel">
                 <span className="summary-kicker">我理解你更关心</span>
-                <h2>{getIntentSummary(history)}</h2>
+                <ul className="intent-bubbles" aria-label="已选关注点">
+                  {history.length ? history.map((turn, index) => <li key={index}>{turn.answer}</li>) : <li>了解主要观点</li>}
+                </ul>
 
                 <div className="panel-actions summary-actions">
                   <button className="secondary-button" type="button" disabled={isGenerating} onClick={() => { setStage("clarifying"); void loadClarifyingQuestion(history.slice(0, -1)); }}>修改关注点</button>

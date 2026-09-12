@@ -10,3 +10,18 @@
 @media(max-width:600px) { .roundtable-page { padding:0 12px 30px; margin-top:18px; } .roundtable-composer { padding:16px; } }
 
 .roundtable-page .room-controls button[aria-pressed='true'] { background:#056de8; color:white; border-color:#056de8; }
+
+.roundtable-live-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(330px, 1fr); gap: 20px; align-items: start; margin-top: 20px; }
+.roundtable-live-layout .room-experience { margin: 0; }
+.roundtable-chat { min-width: 0; border: 1px solid #dce5ef; border-radius: 16px; overflow: hidden; background: #fff; }
+.roundtable-chat-header { padding: 16px 18px; border-bottom: 1px solid #e5e7eb; }
+.roundtable-chat-header h2 { margin: 0 0 6px; font-size: 18px; }
+.roundtable-chat-header p { margin: 0 0 6px; line-height: 1.6; font-size: 13px; }
+.roundtable-chat-header > span { color: #8590a6; font-size: 12px; }
+.roundtable-chat .roundtable-chat-messages { height: 480px; max-height: 60vh; padding: 14px !important; background: #f2f4f7; }
+.chat-avatar { display: grid; place-items: center; flex: 0 0 30px; height: 30px; margin-right: 8px; border-radius: 8px; background: #dceaff; color: #056de8; font-weight: 600; }
+.chat-avatar-self { order: 1; margin: 0 0 0 8px; background: #056de8; color: white; }
+.chat-reply { margin: 0 0 8px; padding: 8px 10px; border-left: 3px solid #b6c9e0; background: #eef3f9; color: #64748b; font-size: 12px; }
+.roundtable-chat > div:not(.roundtable-chat-messages), .roundtable-chat > form { padding: 0 14px 14px; flex-wrap: wrap; }
+.roundtable-chat > form input { min-width: 0; padding: 10px; border: 1px solid #dce5ef; border-radius: 8px; }
+@media(max-width: 850px) { .roundtable-live-layout { grid-template-columns: 1fr; } }
