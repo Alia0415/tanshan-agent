@@ -44,7 +44,8 @@ export function WaveProgress({
       <div
         className={styles.liquid}
         style={{
-          height: `${progress}%`,
+          // At completion even the deepest wave trough clears the top edge.
+          transform: `translateY(${progress === 100 ? -10 : 100 - progress}%)`,
           opacity: progress === 0 ? 0 : 1,
         }}
         aria-hidden="true"

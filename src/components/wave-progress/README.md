@@ -19,14 +19,15 @@ import { WaveProgressFloat } from "@/components/wave-progress";
 
 <WaveProgressFloat
   value={progress}
-  caption="正在了解你的关注点"
   position="bottom-right"
 />;
 ```
 
-浮窗默认固定在右下角，移动端会缩小边距并适配底部安全区域。正式页面也可以只使用 `WaveProgress`，自行实现浮窗外壳。
+浮窗默认固定在右下角，只显示水波圆，不显示外框、文字或百分比；进度名称和数值仍提供给屏幕阅读器。移动端会缩小边距并适配底部安全区域。水波振幅和偏移随圆的尺寸等比例缩放，避免小尺寸下出现尖峰。正式页面也可以只使用 `WaveProgress`。
 
 ## 推荐的业务进度映射
+
+首页 `Workspace` 已接入浮窗：仅在 `clarifying` 且有追问卡片时显示；修改条件或打开关于弹窗时隐藏。水位按 `(clarification_count + 1) / (MAX_CLARIFICATION_ROUNDS + 1)` 推进，保留完成阶段，不把仍在等待回答的最后一问显示成 100%。这是轮次进度，不是理解程度或答案准确率。提交等待或失败时保持水位，下一轮返回后再上升；最后一轮回答被确认（包括提前结束或跳过）后升到 100%，用 1 秒完成上升并停留约 0.8 秒后收起；不会延迟后端回答流程。新建提问立即收起。满水位会将波谷抬过圆顶并补足底部水体，保证没有白色缺口。手机端缩小水波球并预留底部滚动空间。
 
 ```ts
 const progressByStage = {

@@ -2022,3 +2022,22 @@ summary {
   .home-principles { gap: 12px; font-size: 10px; flex-wrap: wrap; }
   .page-footer { padding: 20px 16px; font-size: 10px; }
 }
+
+/* Keep the clarification indicator outside the reading column. */
+.app-shell .clarification-progress-float {
+  pointer-events: none;
+  z-index: 9;
+}
+@media (max-width: 800px) {
+  .app-shell.has-clarification-progress {
+    padding-bottom: calc(112px + env(safe-area-inset-bottom));
+  }
+  .app-shell .clarification-progress-float {
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+  .clarification-progress-float [role="progressbar"] {
+    width: 64px !important;
+    height: 64px !important;
+  }
+}

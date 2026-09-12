@@ -18,12 +18,13 @@
   right: 0;
   bottom: 0;
   left: 0;
+  height: 100%;
   overflow: visible;
   background: transparent;
   transition:
-    height 1000ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 1000ms cubic-bezier(0.22, 1, 0.36, 1),
     opacity 260ms ease;
-  will-change: height;
+  will-change: transform;
 }
 
 .wave {
@@ -31,9 +32,18 @@
   z-index: 1;
   left: 0;
   width: 200%;
-  height: 360px;
+  /* Match the SVG's 360:320 height-to-one-period ratio at every orb size. */
+  height: 112.5%;
   overflow: hidden;
   will-change: transform;
+}
+
+/* Extend the water below the SVG so raising its trough never exposes the bottom. */
+.liquid::before {
+  content: "";
+  position: absolute;
+  inset: 20% 0 -20%;
+  background: #0861ea;
 }
 
 .waveBody {
@@ -45,7 +55,7 @@
 }
 
 .backWave {
-  top: -31px;
+  top: -10%;
   color: #76a8ff;
   opacity: 0.78;
   animation: waveBack 5.8s linear infinite;
@@ -53,7 +63,7 @@
 
 .frontWave {
   z-index: 2;
-  top: -26px;
+  top: -9.375%;
   color: #0861ea;
   animation: waveFront 3.9s linear infinite;
 }

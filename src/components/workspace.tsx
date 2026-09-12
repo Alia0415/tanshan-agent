@@ -23,6 +23,7 @@ import {
 import { MAX_CLARIFICATION_ROUNDS, type Context, type ContextPatch, type Session } from "@/lib/domain/types";
 import { ContextFields, ContextTags } from "./context-fields";
 import { AnswerCard } from "./answer-card";
+import { WaveProgressFloat } from "./wave-progress";
 
 type Result = { session: Session; auto_answer?: boolean };
 const STORAGE_KEY = "wenshan.agent-session-v2";
@@ -99,6 +100,7 @@ export function Workspace() {
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
   const [restoring, setRestoring] = useState(true);
+  const [finishingClarification, setFinishingClarification] = useState(false);
   const [editing, setEditing] = useState(false);
   const [about, setAbout] = useState(false);
   const [connectionLost, setConnectionLost] = useState(false);
@@ -125,6 +127,9 @@ export function Workspace() {
   }
 
   function apply(next: Session) {
+    if (session?.stage === "clarifying" && next.stage !== "clarifying") {
+      setFinishingClarification(true);
+    }
     setClarificationAnswer("");
     setSession((previous) =>
       previous &&
@@ -170,6 +175,13 @@ export function Workspace() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!finishingClarification) return;
+    // Let the 1-second rise finish, then hold the full orb briefly.
+    const timer = setTimeout(() => setFinishingClarification(false), 1800);
+    return () => clearTimeout(timer);
+  }, [finishingClarification]);
 
   const sessionId = session?.session_id;
   const version = session?.context_version;
@@ -335,6 +347,7 @@ export function Workspace() {
     if (busy) return;
     epoch.current += 1;
     setSession(null);
+    setFinishingClarification(false);
     setQuestion("");
     setContext(emptyContext());
     setFreeText("");
@@ -348,6 +361,14 @@ export function Workspace() {
   }
   const isWorking =
     session && ["searching", "generating"].includes(session.stage);
+  const showClarificationProgress =
+    Boolean(session) &&
+    ((session?.stage === "clarifying" && Boolean(session.clarification)) || finishingClarification) &&
+    !editing && !about;
+  const clarificationRound = Math.min(
+    MAX_CLARIFICATION_ROUNDS,
+    (session?.clarification_count ?? 0) + 1,
+  );
   const currentAnswer = session?.answers.find(
     (answer) => answer.context_version === session.context_version,
   );
@@ -375,7 +396,7 @@ export function Workspace() {
   };
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${showClarificationProgress ? " has-clarification-progress" : ""}`}>
       <aside className="sidebar">
         <Link className="brand" href="/" aria-label="问山首页">
           <span className="brand-icon">
@@ -937,6 +958,15 @@ export function Workspace() {
           <span>匿名会话保留 24 小时</span>
         </footer>
       </div>
+      {showClarificationProgress && (
+        <WaveProgressFloat
+          // The actual end of clarification fills the orb, even on an early exit.
+          value={finishingClarification ? 100 : (clarificationRound / (MAX_CLARIFICATION_ROUNDS + 1)) * 100}
+          size={80}
+          label={finishingClarification ? "追问已完成" : `追问第 ${clarificationRound} 轮，最多 ${MAX_CLARIFICATION_ROUNDS} 轮`}
+          className="clarification-progress-float"
+        />
+      )}
       {about && (
         <div
           className="modal-backdrop"
