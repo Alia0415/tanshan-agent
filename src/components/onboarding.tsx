@@ -10,6 +10,8 @@ type Step = {
   art: "welcome" | "chat" | "book" | "roundtable";
 };
 
+const SEEN_KEY = "wenshan.onboarding-seen";
+
 const STEPS: Step[] = [
   {
     eyebrow: "为什么是问山",
@@ -129,9 +131,25 @@ function StepArt({ kind }: { kind: Step["art"] }) {
 }
 
 export function Onboarding() {
-  // 每次进入 Agent 问答页（含刷新）都展示；关闭后本次停留内不再出现
-  const [open, setOpen] = useState(true);
+  // 服务端与首次客户端渲染均隐藏，避免老用户在读取记录前看到弹层闪现。
+  const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      try {
+        if (window.localStorage.getItem(SEEN_KEY)) return;
+        // 展示即记录；未看完就刷新或离开，也不重复展示。
+        window.localStorage.setItem(SEEN_KEY, "1");
+      } catch {
+        // 无法持久化时不自动弹出，以免每次访问都打断用户。
+        return;
+      }
+      setOpen(true);
+    });
+    // 取消未执行的检查，兼容卸载及 Strict Mode 的 effect 重放。
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
