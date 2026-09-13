@@ -977,6 +977,85 @@ summary {
 .progress-panel > .primary {
   margin-top: 20px;
 }
+.search-progress {
+  width: min(100%, 360px);
+  margin: 25px auto 8px;
+  text-align: left;
+}
+.search-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #64748b;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.search-progress-track {
+  height: 6px;
+  margin: 12px 0 18px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #edf2f9;
+}
+.search-progress-track > span {
+  display: block;
+  width: 40%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #b7d4ff, #6b9de3);
+  animation: search-travel 2.8s ease-in-out infinite alternate;
+}
+.search-progress.is-paused .search-progress-track > span {
+  animation-play-state: paused;
+  background: #a4adbb;
+}
+.search-progress-steps {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.search-progress-steps li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #718096;
+}
+.search-progress-steps li > span {
+  display: grid;
+  place-items: center;
+  width: 23px;
+  height: 23px;
+  border-radius: 50%;
+  background: #f1f4f8;
+  flex-shrink: 0;
+}
+.search-progress-steps .is-current {
+  color: #3568a8;
+  font-weight: 600;
+}
+.search-progress-steps .is-current > span {
+  background: #e7f0ff;
+  box-shadow: 0 0 0 3px #f5f8ff;
+}
+.search-progress-steps .is-done {
+  color: #437766;
+}
+.search-progress-caption {
+  min-height: 40px;
+  margin: 18px 0 0;
+  color: #64748b;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.8;
+}
+@keyframes search-travel {
+  from { transform: translateX(0); }
+  to { transform: translateX(150%); }
+}
 .progress-dots {
   display: flex;
   gap: 5px;
