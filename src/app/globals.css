@@ -2679,3 +2679,25 @@ summary {
   .feed-layout { grid-template-columns: 1fr; }
   .history-panel h1 { font-size: 20px; }
 }
+
+/* ===== 手机端精简（≤768px，桌面不受影响） ===== */
+@media (max-width: 768px) {
+  /* 1. 顶部产品导航行整体去除（底部标签栏已承担跳转） */
+  .product-nav { display: none; }
+  /* 3. 隐藏「关于问山」入口 */
+  .header-nav button:last-child { display: none; }
+  /* 2. 提问示例改为左侧阶梯状横排矩形标签 */
+  .ds-suggest { flex-direction: column; align-items: flex-start; gap: 9px; max-width: none; }
+  .ds-chip {
+    display: block;
+    width: 92%;
+    border-radius: 10px;
+    padding: 11px 15px;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ds-chip:nth-child(2) { width: 74%; }
+  .ds-chip:nth-child(3) { width: 57%; }
+}

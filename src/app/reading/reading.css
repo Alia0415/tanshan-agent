@@ -1044,3 +1044,30 @@ a:focus-visible {
   .moon-line { font-size: 16px; }
   .moon-line.current { font-size: 19px; }
 }
+
+/* ===== 手机端月亮页：唱片左上半露、歌词紧排右上、热评上移 ===== */
+.moon-lyrics-track { transform: translateY(calc(50% - (var(--moon-idx, 0) * 96px + 48px))); }
+@media (max-width: 768px) {
+  .moon-stage { display: block; position: relative; min-height: 0; padding: 10px 14px 24px; }
+  .moon-disc {
+    position: absolute; top: 10px; left: 0;
+    width: 280px; height: 280px; z-index: 1;
+  }
+  .moon-spin { width: 280px; margin-left: -140px; }
+  .moon-lyrics {
+    position: absolute; top: 40px; left: 158px; right: 10px;
+    width: auto; gap: 8px; z-index: 2;
+  }
+  .moon-filter button:nth-child(2) { display: none; }
+  .moon-controls-label { display: none; }
+  .moon-controls { gap: 9px; }
+  .moon-controls button { width: 34px; height: 34px; }
+  .moon-controls .moon-toggle { width: 40px; height: 40px; }
+  .moon-lyrics-window { height: 318px; -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 8%, #000 92%, transparent 100%); mask-image: linear-gradient(180deg, transparent 0%, #000 8%, #000 92%, transparent 100%); }
+  .moon-lyrics-track { transform: translateY(calc(50% - (var(--moon-idx, 0) * 64px + 32px))); }
+  .moon-line { height: 64px; font-size: 14px; }
+  .moon-line.current { font-size: 16px; }
+  .moon-answer { width: 100%; margin-top: 356px; }
+  .moon-answer h2 { font-size: 21px; }
+  .moon-answer-body p { font-size: 14.5px; -webkit-line-clamp: 7; }
+}

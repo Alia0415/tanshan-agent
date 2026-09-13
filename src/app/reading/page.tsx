@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import Image from "next/image";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import type { CSSProperties, FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import type { Question } from "@/lib/reading/discovery";
 
@@ -9,7 +10,7 @@ type AnswerSummary = { url: string; author: string; excerpt: string; votes: numb
 type AnswerState = { loading: boolean; error: string; answers: AnswerSummary[] };
 const EMPTY_ANSWERS: AnswerState = { loading: true, error: "", answers: [] };
 const AUTO_ADVANCE_MS = 9000;
-const LINE_HEIGHT = 96; // 与 CSS 中 .moon-line 的高度保持一致，一屏共 5 行
+// 行高由 CSS 控制（--moon-line-h）：桌面 96px / 手机 64px，位移在 CSS 中按变量计算
 
 export default function Home() {
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -89,7 +90,7 @@ export default function Home() {
           : error ? <div className="moon-notice" role="alert"><p>{error}</p><button onClick={() => browse(searchTerm, view)}>重试</button></div>
           : questions.length === 0 ? <p className="moon-notice">没有找到问题，换一个关键词试试。</p>
           : <div className="moon-lyrics-window">
-              <div className="moon-lyrics-track" style={{ transform: `translateY(calc(50% - ${(safeIndex * LINE_HEIGHT + LINE_HEIGHT / 2)}px))` }}>
+              <div className="moon-lyrics-track" style={{ "--moon-idx": safeIndex } as CSSProperties}>
                 {questions.map((item, i) => {
                   const distance = Math.abs(i - safeIndex);
                   return <button type="button" key={item.id}

@@ -198,3 +198,29 @@
   from { opacity: 0; transform: translateY(10px) scale(0.96); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+/* ===== 手机端圆桌：场景置顶无边框，页面不滚动、聊天内部滚动 ===== */
+@media (max-width: 850px) {
+  .roundtable-title { display: none; }
+  .roundtable-page { height: calc(100dvh - 76px); overflow: hidden; padding-bottom: 0; }
+  .roundtable-live-layout {
+    display: flex; flex-direction: column;
+    grid-template-columns: none; grid-template-rows: none;
+    gap: 0; margin: 0; padding: 0; flex: 1; min-height: 0;
+  }
+  .roundtable-live-stage { flex: 0 0 42%; min-height: 0; }
+  .roundtable-live-stage .room-experience {
+    flex: none; height: 100%; margin: 0;
+    border: 0; border-radius: 0; box-shadow: none;
+  }
+  .roundtable-live-layout .room-world { width: 100%; height: 100%; max-height: none; aspect-ratio: auto; margin: 0; }
+  .room-caption { display: none; }
+  .roundtable-summary { display: none; }
+  .roundtable-live-chat { flex: 1; min-height: 0; height: auto; }
+  .roundtable-live-chat .wechat-phone { height: 100%; min-height: 0; }
+}
+/* 圆桌页手机端彻底锁定页面滚动（聊天框内部仍可滚动） */
+@media (max-width: 850px) {
+  html:has(.roundtable-page) { overflow: hidden; }
+  html:has(.roundtable-page) body { overflow: hidden; }
+}
