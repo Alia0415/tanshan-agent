@@ -1075,3 +1075,34 @@ a:focus-visible {
   .moon-answer h2 { font-size: 21px; }
   .moon-answer-body p { font-size: 14.5px; -webkit-line-clamp: 7; }
 }
+
+/* ===== 手机端阅读地图适配：加高地图、站点错开、卡片避让、时间线收紧 ===== */
+@media (max-width: 768px) {
+  .app-shell .sky-map { height: 560px; margin-top: 14px; border-radius: 12px; }
+  .app-shell .sky-dot { width: 40px; height: 40px; font-size: 14px; }
+  .app-shell .sky-tag { max-width: 72px; }
+  .app-shell .sky-tag strong { font-size: 10.5px; line-height: 1.35; }
+  .app-shell .sky-tag small { font-size: 9.5px; }
+  /* 奇偶站上下交错，避免相邻标签横向挤压重叠 */
+  .app-shell .sky-station:nth-of-type(odd) { margin-top: 24px; }
+  .app-shell .sky-station:nth-of-type(1) { margin-top: 4px; flex-direction: column-reverse; }
+  .app-shell .sky-station:nth-of-type(4) { margin-top: 56px; }
+  .app-shell .sky-station:nth-of-type(even) { margin-top: -24px; }
+  
+  /* 起点卡贴底缩小，避开 1 号站 */
+  .app-shell .sky-start { max-width: 116px; left: 4px; bottom: 8px; padding: 7px 9px; border-radius: 10px; }
+  .app-shell .sky-start span { font-size: 9.5px; }
+  .app-shell .sky-start strong { font-size: 10.5px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; }
+  /* 登顶卡缩小上提，避开 4 号站 */
+  .app-shell .sky-summit { right: 4px; top: 0.5%; }
+  .app-shell .sky-summit svg { width: 22px; height: 15px; }
+  .app-shell .sky-summit span { font-size: 9.5px; }
+  .app-shell .sky-progress { top: 10px; left: 10px; font-size: 10px; padding: 4px 10px; }
+  /* 旅程时间线收紧并可横滑 */
+  .app-shell .journey-bar { padding: 12px 12px 10px; }
+  .app-shell .journey-stop { min-width: 78px; padding-right: 14px; }
+  .app-shell .journey-number { font-size: 19px; }
+  .app-shell .journey-stop.current .journey-number { font-size: 22px; }
+  .app-shell .journey-label { max-width: 58px; font-size: 10px; }
+  .app-shell .journey-line { width: 10px; }
+}
