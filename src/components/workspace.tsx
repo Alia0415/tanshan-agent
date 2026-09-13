@@ -1,18 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
-  ArrowDown,
   ArrowRight,
+  ArrowUp,
   BookOpen,
-  History,
   Check,
-  Compass,
   BriefcaseBusiness,
   Leaf,
   LoaderCircle,
   MessageCircle,
+  MessagesSquare,
+  MoreHorizontal,
   Mountain,
   PencilLine,
   Plus,
@@ -114,6 +115,26 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
   const epoch = useRef(0);
   const questionInput = useRef<HTMLTextAreaElement>(null);
   const pendingAnswer = useRef<{ key: string; id: string } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const result = await api<{ sessions: SessionSummary[] }>(
+          "/api/sessions",
+        );
+        if (active) {
+          setHistory(result.sessions);
+          setHistoryLoaded(true);
+        }
+      } catch {
+        // 侧边栏历史仅作展示，加载失败时保持空态即可。
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   function dialogKeys(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.key === "Escape") setAbout(false);
@@ -395,6 +416,23 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
     });
   }
   const stageLabels = { understanding: "理解中", clarifying: "待补充", ready: "待分析", searching: "检索中", generating: "生成中", completed: "已回答", error: "未完成" };
+  const historyGroups = useMemo(() => {
+    const dayStart = new Date();
+    dayStart.setHours(0, 0, 0, 0);
+    const today = dayStart.getTime();
+    const yesterday = today - 86_400_000;
+    const groups: { label: string; items: SessionSummary[] }[] = [
+      { label: "今天", items: [] },
+      { label: "昨天", items: [] },
+      { label: "更早", items: [] },
+    ];
+    for (const item of history) {
+      const time = Date.parse(item.created_at);
+      const index = time >= today ? 0 : time >= yesterday ? 1 : 2;
+      groups[index].items.push(item);
+    }
+    return groups.filter((group) => group.items.length > 0);
+  }, [history]);
   const isWorking =
     session && ["searching", "generating"].includes(session.stage);
   const showClarificationProgress =
@@ -436,7 +474,7 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
       <aside className="sidebar">
         <Link className="brand" href="/" aria-label="问山首页">
           <span className="brand-icon">
-            <Mountain size={25} strokeWidth={1.6} />
+            <Mountain size={21} strokeWidth={1.7} />
           </span>
           <span>
             问山<small>WENSHAN</small>
@@ -448,53 +486,68 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
           onClick={newQuestion}
           disabled={Boolean(busy) || restoring}
         >
-          <Plus size={18} />
-          开启新提问<span>↗</span>
+          <Plus size={16} />
+          开启新提问
         </button>
-        <div className="sidebar-label">你的探索空间</div>
-        <button
-          type="button"
-          className={`sidebar-item${historyOpen ? "" : " active"}`}
-          onClick={() => {
-            setHistoryOpen(false);
-            document
-              .getElementById("main-content")
-              ?.scrollIntoView({ behavior: "smooth" });
-          }}
-        >
-          <MessageCircle size={17} />
-          {session ? "当前提问" : "开始探索"}
-          <span className="active-dot" />
-        </button>
-        <button type="button" className={`sidebar-item${historyOpen ? " active" : ""}`} onClick={openHistory} disabled={Boolean(busy) || restoring}>
-          <History size={17} />历史问题
-        </button>
-        {session && (
-          <p className="current-question">{session.original_question}</p>
-        )}
-        <div className="sidebar-story">
-          <span className="story-line" />
-          <p>
-            每一次多问，
-            <br />
-            都是向答案
-            <br />
-            <em>靠近一步。</em>
-          </p>
-          <Mountain size={100} strokeWidth={0.65} aria-hidden="true" />
-        </div>
+        <nav className="side-history" aria-label="历史提问">
+          {session && (
+            <>
+              <div className="side-group-label">当前</div>
+              <button
+                type="button"
+                className="side-history-item active"
+                onClick={() => {
+                  setHistoryOpen(false);
+                  document
+                    .getElementById("main-content")
+                    ?.scrollIntoView({ behavior: "smooth" });
+                }}
+                title={session.original_question}
+              >
+                <MessageCircle size={14} aria-hidden="true" />
+                {session.original_question}
+              </button>
+            </>
+          )}
+          {historyGroups.map((group) => (
+            <div className="side-group" key={group.label}>
+              <div className="side-group-label">{group.label}</div>
+              {group.items.map((item) => (
+                <button
+                  type="button"
+                  key={item.session_id}
+                  className={`side-history-item${
+                    item.session_id === sessionId ? " current" : ""
+                  }`}
+                  disabled={Boolean(busy)}
+                  onClick={() => openSession(item.session_id)}
+                  title={item.original_question}
+                >
+                  {item.original_question}
+                </button>
+              ))}
+            </div>
+          ))}
+          {historyLoaded && history.length === 0 && (
+            <p className="side-history-empty">
+              还没有历史提问，
+              <br />
+              从上面开启第一次提问吧。
+            </p>
+          )}
+        </nav>
         <div className="sidebar-bottom">
           <button
             type="button"
-            className="sidebar-item"
+            className="side-user"
             onClick={() => setAbout(true)}
           >
-            <Compass size={17} />
-            关于问山
-            <ArrowRight size={15} />
+            <span className="side-avatar">访</span>
+            <span className="side-user-name">访客</span>
+            <MoreHorizontal size={16} aria-hidden="true" />
           </button>
           <div className="privacy">
-            <ShieldCheck size={14} />
+            <ShieldCheck size={13} />
             <span>匿名探索 · 会话保留 24 小时</span>
           </div>
         </div>
@@ -563,45 +616,99 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
               ))}</div>}
             </section>
           ) : !session ? (
-            <>
-              <section className="hero">
-                <div className="hero-kicker">
-                  <span />
-                  问山 · 智能问答
+            <section className="ds-entry">
+              <div className="ds-greeting">
+                <span className="ds-logo" aria-hidden="true">
+                  <Mountain size={30} strokeWidth={1.5} />
+                </span>
+                <h1>你好，这里是问山</h1>
+                <p>多问一句，答案更近一步</p>
+              </div>
+              <nav className="ds-entries" aria-label="其他入口">
+                <div className="ds-entry-wrap">
+                  <span className="ds-pop-side" aria-hidden="true">
+                    <Image
+                      src="/entry-previews/reading-preview.png"
+                      alt=""
+                      width={448}
+                      height={267}
+                    />
+                  </span>
+                  <span className="ds-pop" aria-hidden="true">
+                    <span className="ds-pop-art">
+                      <svg viewBox="0 0 76 56" fill="none">
+                        <path
+                          d="M38 13C32 7.5 21.5 6.5 13 9.5V39c8.5-3 19-2 25 3"
+                          fill="#edf5ff"
+                          stroke="#056de8"
+                          strokeWidth="1.8"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M38 13c6-5.5 16.5-6.5 25-3.5V39c-8.5-3-19-2-25 3"
+                          fill="#fff"
+                          stroke="#056de8"
+                          strokeWidth="1.8"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M18 18h12M18 24h12M18 30h8M46 18h12M46 24h12M46 30h8"
+                          stroke="#9ec7fa"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                        />
+                        <path
+                          d="M38 12v30"
+                          stroke="#056de8"
+                          strokeWidth="1.8"
+                        />
+                      </svg>
+                    </span>
+                    <strong>阅读助手</strong>
+                    <small>搜索知乎讨论，先把问题读透</small>
+                  </span>
+                  <Link href="/reading" className="ds-entry-link">
+                    <BookOpen size={17} aria-hidden="true" />
+                    阅读助手
+                  </Link>
                 </div>
-                <h1>
-                  有问题，就会有答案
-                </h1>
-                <p>
-                  先说说你想知道什么，
-                  <br className="mobile-break" />
-                  我们一起把问题问清楚。
-                </p>
-                <div className="hero-illustration" aria-hidden="true">
-                  <svg viewBox="0 0 220 180" fill="none">
-                    <circle cx="155" cy="43" r="21" fill="#e1e9d7" />
-                    <path
-                      d="m11 152 67-94 36 49 23-33 72 78H11Z"
-                      stroke="#779789"
-                      strokeWidth="1.3"
+                <div className="ds-entry-wrap">
+                  <span className="ds-pop-side" aria-hidden="true">
+                    <Image
+                      src="/entry-previews/roundtable-preview.png"
+                      alt=""
+                      width={448}
+                      height={251}
                     />
-                    <path
-                      d="m36 152 57-66 53 66M114 107l34 45M137 74l8 46 64 32M78 58l-3 51-64 43M93 86l-18 23 71 43"
-                      stroke="#9db1a5"
-                      strokeWidth=".8"
-                    />
-                    <path d="M3 166h212" stroke="#ced8ce" />
-                    <path
-                      d="m157 153 3-20 4 20m-4-15 8 10m-8-6-5 5"
-                      stroke="#779789"
-                      strokeWidth="1.2"
-                    />
-                  </svg>
-                  <span>EVERY QUESTION IS A NEW PATH</span>
+                  </span>
+                  <span className="ds-pop" aria-hidden="true">
+                    <span className="ds-pop-art">
+                      <svg viewBox="0 0 76 56" fill="none">
+                        <path
+                          d="M19 15 30 25M57 15 46 25M19 45 30 36M57 45 46 36"
+                          stroke="#dbeaff"
+                          strokeWidth="1.6"
+                        />
+                        <circle cx="38" cy="30" r="9.5" fill="#edf5ff" stroke="#056de8" strokeWidth="1.6" />
+                        <circle cx="14" cy="12" r="6.5" fill="#056de8" />
+                        <circle cx="62" cy="12" r="6.5" fill="#f59e0b" />
+                        <circle cx="10" cy="42" r="6.5" fill="#10b981" />
+                        <circle cx="66" cy="42" r="6.5" fill="#8b5cf6" />
+                        <rect x="26" y="2" width="14" height="8" rx="4" fill="#056de8" opacity="0.85" />
+                        <rect x="42" y="46" width="16" height="8" rx="4" fill="#10b981" opacity="0.85" />
+                      </svg>
+                    </span>
+                    <strong>观点圆桌</strong>
+                    <small>多立场 Agent 同场交锋</small>
+                  </span>
+                  <Link href="/roundtable" className="ds-entry-link">
+                    <MessagesSquare size={17} aria-hidden="true" />
+                    观点圆桌
+                  </Link>
                 </div>
-              </section>
+              </nav>
               <form
-                className={`question-composer ${question.length > 2000 ? "invalid" : ""}`}
+                className={`ds-composer ${question.length > 2000 ? "invalid" : ""}`}
                 onSubmit={(event) => {
                   event.preventDefault();
                   startQuestion();
@@ -615,7 +722,7 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
                   ref={questionInput}
                   value={question}
                   onChange={(event) => setQuestion(event.target.value)}
-                  placeholder="例如，要不要从大公司去创业公司？"
+                  placeholder="想问什么？例如：要不要从大公司去创业公司？"
                   disabled={Boolean(busy) || restoring}
                   onKeyDown={(event) => {
                     if (
@@ -627,91 +734,58 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
                     }
                   }}
                 />
-                <div className="composer-footer">
-                  <span>
-                    <Sparkles size={14} />
-                    {question.length > 2000
-                      ? "最多 2,000 字符，请缩短后再发送"
-                      : "不必一次问得完美，交给我们一起梳理"}
+                <div className="ds-composer-bar">
+                  <span className="ds-mode" title="信息不足时问山会先追问，再回答">
+                    <Sparkles size={13} aria-hidden="true" />
+                    智能追问
                   </span>
-                  <div>
-                    <span className="character-count">
-                      {question.length} / 2000
-                    </span>
-                    <button
-                      className="send-button"
-                      type="submit"
-                      aria-label="发送问题"
-                      disabled={
-                        Boolean(busy) ||
-                        restoring ||
-                        !question.trim() ||
-                        question.length > 2000
-                      }
-                    >
-                      {busy || restoring ? (
-                        <LoaderCircle size={19} className="spin" />
-                      ) : (
-                        <><Plus size={17} /> 提问</>
-                      )}
-                    </button>
-                  </div>
+                  {question.length > 2000 && (
+                    <span className="ds-error">最多 2,000 字，请缩短</span>
+                  )}
+                  {question.length > 1800 && question.length <= 2000 && (
+                    <span className="ds-count">{2000 - question.length}</span>
+                  )}
+                  <button
+                    className="ds-send"
+                    type="submit"
+                    aria-label="发送问题"
+                    disabled={
+                      Boolean(busy) ||
+                      restoring ||
+                      !question.trim() ||
+                      question.length > 2000
+                    }
+                  >
+                    {busy || restoring ? (
+                      <LoaderCircle size={18} className="spin" />
+                    ) : (
+                      <ArrowUp size={18} strokeWidth={2.2} />
+                    )}
+                  </button>
                 </div>
               </form>
+              <div className="ds-suggest" aria-label="推荐问题">
+                {examples.map((example) => (
+                  <button
+                    className="ds-chip"
+                    type="button"
+                    key={example.category}
+                    disabled={Boolean(busy) || restoring}
+                    onClick={() => {
+                      setQuestion(example.text);
+                      questionInput.current?.focus();
+                    }}
+                  >
+                    {example.text}
+                  </button>
+                ))}
+              </div>
               {busy && (
                 <p className="loading-caption" role="status">
                   {busy}…
                 </p>
               )}
-              <section className="examples">
-                <div className="section-heading">
-                  <span>为你推荐</span>
-                  <span>
-                    选择一个问题，开始探索 <ArrowDown size={13} />
-                  </span>
-                </div>
-                <div className="example-grid">
-                  {examples.map((example) => (
-                    <button
-                      className="example-card"
-                      type="button"
-                      key={example.category}
-                      disabled={Boolean(busy) || restoring}
-                      onClick={() => {
-                        setQuestion(example.text);
-                        questionInput.current?.focus();
-                      }}
-                    >
-                      <span className="example-icon">
-                        <example.icon size={21} strokeWidth={1.5} />
-                      </span>
-                      <span className="example-category">
-                        {example.category}
-                      </span>
-                      <strong>{example.text}</strong>
-                      <span className="example-hint">
-                        {example.hint}
-                        <ArrowRight size={15} />
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </section>
-              <div className="home-principles">
-                <span>
-                  <MessageCircle size={15} />
-                  最多 {MAX_CLARIFICATION_ROUNDS} 轮追问
-                </span>
-                <span>
-                  <Check size={15} />
-                  随时直接回答
-                </span>
-                <span>
-                  <BookOpen size={15} />
-                  有据可循的答案
-                </span>
-              </div>
-            </>
+            </section>
           ) : (
             <>
               <div className="flow-header">
@@ -819,7 +893,7 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
                   {session.clarification.kind === "contextual" ? (
                     Boolean(session.clarification.options?.length) && (
                       <fieldset disabled={Boolean(busy)}>
-                        <legend className="field-hint">选择符合你的情况的选项（{session.clarification.selection_mode === "multiple" ? "可多选" : "单选"}），也可以自由补充</legend>
+                        <legend className="field-hint">选择符合你的情况的选项（<em className="hint-accent">{session.clarification.selection_mode === "multiple" ? "可多选" : "单选"}</em>），也可以自由补充</legend>
                         <div className="chips">
                           {session.clarification.options?.map((option) => (
                             <button type="button" key={option}

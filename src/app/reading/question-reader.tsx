@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { Question } from "@/lib/reading/discovery";
+import { ParticleField } from "./particle-field";
 
 type Stage = "entry" | "clarifying" | "summary" | "map";
 
@@ -38,6 +39,24 @@ type ReadingMapResult = {
 
 type ClarifyQuestion = { prompt: string; hint: string; options: Array<{ id: string; label: string; detail: string }> };
 type ReadingTurn = { prompt: string; answer: string };
+
+// 夜空登山地图：站点沿山路分布的坐标（百分比），与 .sky-trail 的 viewBox 100x52 对应
+function stationPos(index: number, total: number) {
+  const t = total <= 1 ? 0.5 : 0.08 + (0.84 * index) / (total - 1);
+  const x = 7 + 86 * t;
+  const y = 74 - 56 * (0.5 - 0.5 * Math.cos(Math.PI * t)) + (index % 2 === 0 ? 0 : 4);
+  return { x, y };
+}
+const SKY_TRAIL = (() => {
+  const points: string[] = [];
+  for (let step = 0; step <= 24; step++) {
+    const t = step / 24;
+    const x = 7 + 86 * t;
+    const y = 74 - 56 * (0.5 - 0.5 * Math.cos(Math.PI * t));
+    points.push(`${x.toFixed(1)} ${(y * 0.52).toFixed(1)}`);
+  }
+  return `M ${points.join(" L ")}`;
+})();
 
 function RouteIcon() {
   return (
@@ -75,6 +94,7 @@ export default function QuestionReader({ question }: { question: Question }) {
   const [mapSummary, setMapSummary] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [apiError, setApiError] = useState("");
+  const [visitedIds, setVisitedIds] = useState<Set<string>>(new Set());
   const selectedCategory = categories.find((category) => category.id === selectedCategoryId) ?? categories[0];
 
   async function loadClarifyingQuestion(nextHistory: ReadingTurn[] = []) {
@@ -122,6 +142,7 @@ export default function QuestionReader({ question }: { question: Question }) {
       if (!response.ok) throw new Error(result.error || "真实内容整理失败，请重试。");
       setCategories(result.categories);
       setSelectedCategoryId(result.categories[0]?.id ?? "");
+      setVisitedIds(new Set(result.categories[0] ? [result.categories[0].id] : []));
       setMapSummary(result.summary);
       setStage("map");
     } catch (error) {
@@ -142,6 +163,7 @@ export default function QuestionReader({ question }: { question: Question }) {
     setMapSummary("");
     setApiError("");
     setIsGenerating(false);
+    setVisitedIds(new Set());
     setStage("entry");
   }
 
@@ -169,22 +191,23 @@ export default function QuestionReader({ question }: { question: Question }) {
             <div className="reading-handoffs"><Link href={"/roundtable?q=" + encodeURIComponent(question.title)}>带到圆桌讨论 →</Link><Link href={"/?q=" + encodeURIComponent(question.title)}>向 Agent 提问 →</Link></div><a className="question-original" href={question.url} target="_blank" rel="noreferrer">在知乎查看完整问题与回答</a>
           </div>
 
-          {assistantEnabled && <section className={`agent-surface stage-${stage}`} aria-live="polite">
+          {assistantEnabled && stage === "entry" && (
+            <div className="map-cta-row">
+              <button className="map-cta" type="button" onClick={startReading}>
+                <span className="map-cta-icon" aria-hidden="true"><RouteIcon /></span>
+                生成我的阅读地图
+              </button>
+            </div>
+          )}
+
+          {assistantEnabled && stage !== "entry" && <section className={`agent-surface stage-${stage}`} aria-live="polite">
             <div className="agent-heading">
               <div className="agent-name">
                 <span className="agent-icon"><RouteIcon /></span>
                 <div><strong>问山阅读助手</strong></div>
               </div>
-              {stage !== "entry" && stage !== "map" && <span className="step-count">{stage === "summary" ? "已理解" : `${questionIndex + 1} / 3`}</span>}
+              {stage !== "map" && <span className="step-count">{stage === "summary" ? "已理解" : `${questionIndex + 1} / 3`}</span>}
             </div>
-
-            {stage === "entry" && (
-              <div className="entry-panel">
-                <div><h2>回答很多，不知道先看什么？</h2></div>
-                <button className="primary-button" type="button" onClick={startReading}>生成我的阅读地图</button>
-
-              </div>
-            )}
 
                 {stage === "clarifying" && clarifyQuestion && (
                   <div className="clarifying-panel">
@@ -229,90 +252,119 @@ export default function QuestionReader({ question }: { question: Question }) {
                   <div><h2>阅读地图</h2><p>{mapSummary}</p></div>
                   <button className="secondary-button" type="button" onClick={() => setStage("summary")}>调整关注点</button>
                 </div>
-                <div className="route-canvas">
-                  <div className="route-start">
-                    <span>起点 · 当前问题</span>
-                    <strong>{question.title}</strong>
-                  </div>
-                  <span className="route-start-arrow" aria-hidden="true">↓</span>
-                  <div className="route-path" role="list" aria-label="AI 推荐分类阅读顺序">
-                    {categories.map((category, index) => {
-                      return (
-                        <div className="route-leg" key={category.id} role="listitem">
-                          <button
-                            className={`route-node${selectedCategory?.id === category.id ? " active" : ""}`}
-                            type="button"
-                            aria-pressed={selectedCategory?.id === category.id}
-                            onClick={() => { setSelectedCategoryId(category.id); setSelectedPost(null); }}
-                            aria-label={`第 ${index + 1} 类，${category.title}，包含 ${category.posts.length} 篇帖子`}
-                          >
-                            <span className="route-node-top">
-                              <span className="route-number">{index + 1}</span>
-                              <span className="route-verb">{index === 0 ? "先" : index === categories.length - 1 ? "最后" : "再"} · {category.phase}</span>
-                              <span className="route-enter" aria-hidden="true">↓</span>
-                            </span>
-                            <strong className="route-title">{category.title}</strong>
-                            <span className="route-summary">{category.summary}</span>
-                            <span className="route-post">
-                              <span className="route-post-label">本分类内容</span>
-                              <b>{category.posts.length} 篇帖子</b>
-                              <small>点击查看这一类的帖子</small>
-                            </span>
-                          </button>
-                          {index < categories.length - 1 && (
-                            <span className="route-arrow" aria-hidden="true">
-                              <svg viewBox="0 0 34 18"><path d="M1 9h27" /><path d="m23 3 6 6-6 6" /></svg>
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-                {selectedCategory && (
-                  <section className="category-results" aria-labelledby="category-title">
-                    <header className="category-results-header">
-                      <div>
-                        <span>路线第 {categories.findIndex((category) => category.id === selectedCategory.id) + 1} 类</span>
-                        <h3 id="category-title">{selectedCategory.title}</h3>
-                        <p>{selectedCategory.reason}</p>
+
+                <div className="map-stage-layout">
+                  <div className="map-stage-main">
+                    <div className="sky-map" role="group" aria-label="登山阅读路线">
+                      <ParticleField className="sky-particles" />
+                      <svg className="sky-trail" viewBox="0 0 100 52" preserveAspectRatio="none" aria-hidden="true">
+                        <path d={SKY_TRAIL} className="sky-path" />
+                      </svg>
+                      <div className="sky-progress" aria-hidden="true"><span>{visitedIds.size} / {categories.length} 站已探索</span></div>
+                      <div className="sky-summit" aria-hidden="true">
+                        <svg viewBox="0 0 40 26" fill="none">
+                          <path d="M2 24 13 5l6.5 10L24 8l14 16z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+                          <path d="M13 5l2.6 4-1.8 1.4L17 13" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+                        </svg>
+                        <span>登顶 · 观点全貌</span>
                       </div>
-                      <strong>{selectedCategory.posts.length}<small>篇</small></strong>
-                    </header>
-                    <div className="category-post-list" role="list">
-                      {selectedCategory.posts.map((post, index) => (
-                        <article className="category-post-row" key={post.contentId} role="listitem">
-                          <button type="button" onClick={() => setSelectedPost(post)} aria-label={`查看帖子：${post.title}`}>
-                            <span className="post-list-index">{String(index + 1).padStart(2, "0")}</span>
-                            <span className="post-list-copy">
-                              <strong>{post.title}</strong>
-                              <span>{post.excerpt}</span>
-                              <small>{post.author} · {post.voteUpCount} 赞同 · {post.commentCount} 评论 · {post.readTime}</small>
+                      <div className="sky-start">
+                        <span>起点 · 当前问题</span>
+                        <strong>{question.title}</strong>
+                      </div>
+                      {categories.map((category, index) => {
+                        const pos = stationPos(index, categories.length);
+                        const selected = selectedCategory?.id === category.id;
+                        const visited = visitedIds.has(category.id);
+                        return (
+                          <button
+                            key={category.id}
+                            type="button"
+                            draggable={false}
+                            onDragStart={(event) => event.preventDefault()}
+                            className={`sky-station${selected ? " current" : ""}${visited ? " visited" : ""}`}
+                            style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
+                            onClick={() => {
+                              setSelectedCategoryId(category.id);
+                              setSelectedPost(null);
+                              setVisitedIds((previous) => new Set(previous).add(category.id));
+                            }}
+                            aria-pressed={selected}
+                            aria-label={`第 ${index + 1} 站，${category.title}，包含 ${category.posts.length} 篇帖子`}
+                          >
+                            <span className="sky-dot"><b>{String(index + 1).padStart(2, "0")}</b></span>
+                            <span className="sky-tag">
+                              <strong>{category.title}</strong>
+                              <small>{category.posts.length} 篇 · {category.phase}</small>
                             </span>
-                            <span className="post-list-enter" aria-hidden="true">查看</span>
                           </button>
-                        </article>
-                      ))}
+                        );
+                      })}
                     </div>
-                  </section>
-                )}
+
+                    <div className="journey-bar" aria-label="阅读旅程">
+                      {categories.map((category, index) => {
+                        const selected = selectedCategory?.id === category.id;
+                        const visited = visitedIds.has(category.id);
+                        return (
+                          <div key={category.id} className={`journey-stop${selected ? " current" : ""}${visited ? " past" : ""}`}>
+                            <span className="journey-number">{String(index + 1).padStart(2, "0")}</span>
+                            <span className="journey-label">{category.title}</span>
+                            {index < categories.length - 1 && (
+                              <span className={`journey-line${selected ? " current" : visited ? " past" : ""}`} aria-hidden="true" style={{ animationDelay: `${0.3 + index * 0.15}s` }} />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <aside className="map-stage-aside" aria-label="本分类事件列表">
+                    {selectedCategory && (
+                      <section className="category-results" aria-labelledby="category-title">
+                        <header className="category-results-header">
+                          <div>
+                            <span>路线第 {categories.findIndex((category) => category.id === selectedCategory.id) + 1} 类</span>
+                            <h3 id="category-title">{selectedCategory.title}</h3>
+                            <p>{selectedCategory.reason}</p>
+                          </div>
+                          <strong>{selectedCategory.posts.length}<small>篇</small></strong>
+                        </header>
+                        <div className="category-post-list" role="list">
+                          {selectedCategory.posts.map((post, index) => (
+                            <article className="category-post-row" key={post.contentId} role="listitem">
+                              <button type="button" onClick={() => setSelectedPost(post)} aria-label={`查看帖子：${post.title}`}>
+                                <span className="post-list-index">{String(index + 1).padStart(2, "0")}</span>
+                                <span className="post-list-copy">
+                                  <strong>{post.title}</strong>
+                                  <span>{post.excerpt}</span>
+                                  <small>{post.author} · {post.voteUpCount} 赞同 · {post.commentCount} 评论 · {post.readTime}</small>
+                                </span>
+                                <span className="post-list-enter" aria-hidden="true">查看</span>
+                              </button>
+                            </article>
+                          ))}
+                        </div>
+                      </section>
+                    )}
+                  </aside>
+                </div>
 
                 <p className="source-disclaimer">相关问题与文章 · 搜索摘要</p>
               </div>
             )}
           </section>}
+        </section>
 
+        <aside className="side-column" aria-label="阅读提示">
           {stage !== "map" && (
             <section className="answer-preview" aria-label="普通回答列表预览">
-              <div className="answer-toolbar"><strong>这个问题下的回答</strong><span>搜索返回的摘要</span></div>
+              <div className="answer-toolbar"><strong>这个问题下的回答</strong><span>摘要</span></div>
               {ordinaryLoading ? <p className="feed-notice" role="status">正在加载回答摘要…</p> : ordinaryError ? <p className="feed-notice" role="alert">{ordinaryError}</p> : ordinary.length === 0 ? <p className="feed-notice">暂未检索到这个问题的回答摘要，可前往知乎阅读。</p> :
                 ordinary.map(item => <article className="ordinary-answer" key={item.url}><strong>{item.author}</strong><p>{item.excerpt}</p><div><span>{item.votes} 赞同</span><a href={item.url} target="_blank" rel="noreferrer">阅读完整回答</a></div></article>)}
               <a className="all-answers" href={question.url} target="_blank" rel="noreferrer">前往知乎查看全部回答</a>
             </section>
           )}
-        </section>
-
-        <aside className="side-column" aria-label="阅读提示">
           <div className="side-card"><h2>这次阅读</h2><dl><div><dt>问题类型</dt><dd>{assistantEnabled ? "已记录上榜" : "普通问题"}</dd></div><div><dt>整理方式</dt><dd>{assistantEnabled ? "按你的关注点" : "浏览回答"}</dd></div><div><dt>内容来源</dt><dd>知乎回答与文章</dd></div></dl></div>
 
         </aside>
