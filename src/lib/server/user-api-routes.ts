@@ -1,0 +1,36 @@
+import { z } from "zod";
+import { handle, identity } from "@/lib/server/http";
+import { fetchUserApi, requireOAuthSession } from "@/lib/server/oauth";
+
+// 五个用户数据接口共用的代理工厂：登录校验 + 分页参数校验 + 不自动重试（真实上游调用）。
+
+const pageSchema = z
+  .object({
+    Offset: z.coerce.number().int().min(0).max(1000).optional(),
+    Limit: z.coerce.number().int().min(1).max(50).optional(),
+  })
+  .strip();
+
+export async function proxyUserApi(
+  path: string,
+  searchParams: URLSearchParams,
+) {
+  return handle(async () => {
+    const visitor = await identity();
+    const session = requireOAuthSession(visitor);
+    const query = pageSchema.parse(Object.fromEntries(searchParams));
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query))
+      if (value !== undefined) params.set(key, String(value));
+    const suffix = params.size ? "?" + params.toString() : "";
+    return fetchUserApi(path + suffix, session.accessToken);
+  });
+}
+
+export const favlistQuerySchema = z
+  .object({
+    FavlistUrlToken: z.coerce.number().int().min(1),
+    Offset: z.coerce.number().int().min(0).max(1000).optional(),
+    Limit: z.coerce.number().int().min(1).max(50).optional(),
+  })
+  .strip();

@@ -546,6 +546,11 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
             <span className="side-user-name">访客</span>
             <MoreHorizontal size={16} aria-hidden="true" />
           </button>
+          <Link className="side-user" href="/me">
+            <span className="side-avatar zhihu">知</span>
+            <span className="side-user-name">我的知乎</span>
+            <ArrowRight size={15} aria-hidden="true" />
+          </Link>
           <div className="privacy">
             <ShieldCheck size={13} />
             <span>匿名探索 · 会话保留 24 小时</span>
