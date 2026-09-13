@@ -2641,3 +2641,41 @@ summary {
 .me-list span { color: var(--ink); font-size: 14px; }
 .me-list small { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .side-avatar.zhihu { background: #1772f6; }
+
+/* ===== 手机端底部导航 ===== */
+.mobile-tabbar {
+  display: none;
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 90;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid #e8edf5;
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+}
+.mobile-tabbar a {
+  flex: 1;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 5px 0 3px;
+  border-radius: 12px;
+  color: #8590a6;
+  font-size: 11px;
+  transition: color 0.15s, background-color 0.15s;
+}
+.mobile-tabbar a span { line-height: 1.2; }
+.mobile-tabbar a.on, .mobile-tabbar a:hover {
+  color: var(--green);
+  background: rgba(5, 109, 232, 0.07);
+}
+@media (max-width: 768px) {
+  .mobile-tabbar { display: flex; }
+  /* 各页面为底栏让位，同时隐藏移动端冗余元素，让页面更简洁 */
+  body { padding-bottom: 76px; }
+  .page-grid { width: 100%; margin-top: 0; }
+  .side-column { display: contents; }
+  .discovery-note { display: none; }
+  .feed-layout { grid-template-columns: 1fr; }
+  .history-panel h1 { font-size: 20px; }
+}

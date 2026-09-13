@@ -1040,7 +1040,7 @@ a:focus-visible {
   .moon-lyrics { width: min(560px, 100%); }
   .moon-answer { width: min(560px, 100%); text-align: left; }
   .moon-spin { width: min(300px, 64vw); }
-  .moon-lyrics-window { height: 480px; }
-  .moon-line { font-size: 17px; }
+  .moon-lyrics-window { height: 420px; }
+  .moon-line { font-size: 16px; }
   .moon-line.current { font-size: 19px; }
 }

@@ -1,5 +1,6 @@
 .roundtable-page { max-width:none; margin:0; padding:0; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
 .roundtable-title { flex: none; padding: 10px 18px 0; font-size: 18px; }
+@media (max-width: 850px) { .roundtable-title { padding: 8px 14px 0; font-size: 16px; } }
 .roundtable-live-layout { flex:1; min-height:0; margin-top:8px; padding: 8px 14px 14px; height:auto; align-items:stretch; grid-template-rows: minmax(0, 1fr); }
 .roundtable-live-stage { display:flex; flex-direction:column; gap:12px; min-height:0; }
 .roundtable-live-stage .room-experience { flex:1; min-height:0; margin:0; display:flex; flex-direction:column; }
@@ -33,7 +34,7 @@
 .chat-reply { margin: 0 0 8px; padding: 8px 10px; border-left: 3px solid #b6c9e0; background: #eef3f9; color: #64748b; font-size: 12px; }
 .roundtable-chat > div:not(.roundtable-chat-messages), .roundtable-chat > form { padding: 0 14px 14px; flex-wrap: wrap; }
 .roundtable-chat > form input { min-width: 0; padding: 10px; border: 1px solid #dce5ef; border-radius: 8px; }
-@media(max-width: 850px) { .roundtable-page { height:auto; overflow:visible; } .roundtable-live-layout { grid-template-columns: 1fr; } .roundtable-live-stage .room-experience { flex:none; height:56vh; } .roundtable-live-chat { height:auto; } .roundtable-live-chat .wechat-phone { height:70vh; min-height:480px; } }
+@media(max-width: 850px) { .roundtable-page { height:auto; overflow:visible; padding-bottom: 70px; } .roundtable-live-layout { grid-template-columns: 1fr; } .roundtable-live-stage .room-experience { flex:none; height:56vh; } .roundtable-live-chat { height:auto; } .roundtable-live-chat .wechat-phone { height:70vh; min-height:480px; } }
 
 /* ===== 微信风格圆桌聊天（恢复原型设计） ===== */
 .roundtable-title { display: flex; align-items: center; gap: 8px; font-size: 22px; color: #121212; }
