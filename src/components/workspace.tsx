@@ -568,10 +568,6 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
             </nav>
           </div>
           <div className="topbar-right">
-            <span className="mode-badge">
-              <span />
-              {session?.provider === "live" ? "联网问答" : "体验模式"}
-            </span>
             <button
               type="button"
               className="mobile-new icon-button"

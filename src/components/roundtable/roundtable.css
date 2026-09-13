@@ -1,4 +1,12 @@
-.roundtable-page { max-width:1480px; margin:28px auto; padding:0 20px 48px; }
+.roundtable-page { max-width:none; margin:0; padding:0; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+.roundtable-title { flex: none; padding: 10px 18px 0; font-size: 18px; }
+.roundtable-live-layout { flex:1; min-height:0; margin-top:8px; padding: 8px 14px 14px; height:auto; align-items:stretch; grid-template-rows: minmax(0, 1fr); }
+.roundtable-live-stage { display:flex; flex-direction:column; gap:12px; min-height:0; }
+.roundtable-live-stage .room-experience { flex:1; min-height:0; margin:0; display:flex; flex-direction:column; }
+.roundtable-live-layout .room-world { aspect-ratio: 1672/941; flex: none; width: 100%; height: auto; max-height: 100%; margin: auto 0; }
+.roundtable-summary { margin-top:0; max-height:170px; overflow:auto; flex:none; }
+.roundtable-live-chat { position:relative; height:100%; min-height:0; }
+.roundtable-live-chat .wechat-phone { height:100%; min-height:0; max-height:none; }
 .roundtable-composer { display:grid; gap:14px; padding:24px; background:#fff; border:1px solid #dce5ef; border-radius:16px; }
 .roundtable-composer textarea { width:100%; min-height:110px; padding:16px; resize:vertical; border:1px solid #dce5ef; border-radius:10px; background:#f8fafc; }
 .roundtable-composer .composer-footer { justify-content:flex-end; }
@@ -12,7 +20,7 @@
 .roundtable-page .room-controls button[aria-pressed='true'] { background:#056de8; color:white; border-color:#056de8; }
 
 /* 舞台占主体，微信聊天栏收窄固定在右侧 */
-.roundtable-live-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(330px, 380px); gap: 24px; align-items: start; margin-top: 20px; }
+.roundtable-live-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 336px); gap: 18px; align-items: stretch; grid-template-rows: minmax(0, 1fr); margin-top: 0; }
 .roundtable-live-layout .room-experience { margin: 0; }
 .roundtable-chat { min-width: 0; border: 1px solid #dce5ef; border-radius: 16px; overflow: hidden; background: #fff; }
 .roundtable-chat-header { padding: 16px 18px; border-bottom: 1px solid #e5e7eb; }
@@ -25,12 +33,11 @@
 .chat-reply { margin: 0 0 8px; padding: 8px 10px; border-left: 3px solid #b6c9e0; background: #eef3f9; color: #64748b; font-size: 12px; }
 .roundtable-chat > div:not(.roundtable-chat-messages), .roundtable-chat > form { padding: 0 14px 14px; flex-wrap: wrap; }
 .roundtable-chat > form input { min-width: 0; padding: 10px; border: 1px solid #dce5ef; border-radius: 8px; }
-@media(max-width: 850px) { .roundtable-live-layout { grid-template-columns: 1fr; } }
+@media(max-width: 850px) { .roundtable-page { height:auto; overflow:visible; } .roundtable-live-layout { grid-template-columns: 1fr; } .roundtable-live-stage .room-experience { flex:none; height:56vh; } .roundtable-live-chat { height:auto; } .roundtable-live-chat .wechat-phone { height:70vh; min-height:480px; } }
 
 /* ===== 微信风格圆桌聊天（恢复原型设计） ===== */
 .roundtable-title { display: flex; align-items: center; gap: 8px; font-size: 22px; color: #121212; }
 .roundtable-live-chat { position: sticky; top: 14px; }
-@media (max-width: 1080px) { .roundtable-live-chat { position: static; } }
 .wechat-phone {
   display: flex; flex-direction: column;
   height: calc(100vh - 110px); min-height: 520px; max-height: 820px;
@@ -112,3 +119,81 @@
 .wechat-send:disabled { opacity: 0.45; cursor: default; }
 .wechat-send:hover:not(:disabled) { filter: brightness(1.05); }
 .wechat-footnote { margin: 0; padding: 5px 10px 7px; font-size: 10.5px; color: #a5a5a5; background: #f7f7f7; text-align: center; }
+
+/* ===== 场景设置 / Agent 库：传送进聊天框，默认收起的圆角按钮 ===== */
+.chat-controls-slot {
+  position: absolute;
+  left: 10px; right: 10px;
+  bottom: 96px;
+  z-index: 6;
+}
+.chat-controls-slot .room-controls { padding: 0; background: none; }
+.chat-controls-slot .room-control-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.chat-controls-slot .room-control-tabs { display: flex; gap: 8px; flex: 1; }
+.chat-controls-slot .room-control-tabs button {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid #dcdcdc; background: #fff; color: #444;
+  font-size: 12px; border-radius: 999px; padding: 6px 13px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  transition: border-color 0.15s, color 0.15s, background-color 0.15s;
+  cursor: pointer;
+}
+.chat-controls-slot .room-control-tabs button[aria-expanded='true'] {
+  border-color: #056de8; color: #056de8; background: #f0f6ff;
+}
+.chat-controls-slot .room-control-tabs b {
+  display: inline-flex; width: 16px; height: 16px; align-items: center; justify-content: center;
+  border-radius: 50%; background: #056de8; color: #fff; font-size: 10px;
+}
+.chat-controls-slot .room-control-bar > span {
+  flex: none; font-size: 11px; color: #9a9a9a; background: rgba(0,0,0,0.05);
+  padding: 4px 10px; border-radius: 999px;
+}
+.chat-controls-slot #room-settings,
+.chat-controls-slot .agent-library {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: calc(100% + 8px);
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.16);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+  max-height: 42vh;
+  overflow-y: auto;
+  z-index: 7;
+  animation: chat-panel-pop 0.28s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+.chat-controls-slot #room-settings { grid-template-columns: 1fr 1fr; }
+.chat-controls-slot #room-settings button,
+.chat-controls-slot .agent-library > button {
+  border: 1px solid #e8e8e8; background: #fafafa; color: #333;
+  border-radius: 10px; padding: 9px 10px; font-size: 12px;
+  display: flex; align-items: center; gap: 8px; text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.chat-controls-slot #room-settings button:hover,
+.chat-controls-slot .agent-library > button:not(:disabled):hover {
+  border-color: rgba(5,109,232,0.45); background: rgba(5,109,232,0.07);
+}
+.chat-controls-slot #room-settings button[aria-pressed='true'] {
+  border-color: #056de8; background: #edf5ff; color: #056de8; font-weight: 600;
+}
+.chat-controls-slot .agent-library { grid-template-columns: 1fr; }
+.chat-controls-slot .agent-library strong { font-size: 12px; color: #111; }
+.chat-controls-slot .agent-library em { font-size: 10px; color: #999; font-style: normal; margin-left: auto; }
+.chat-controls-slot .agent-library-avatar {
+  width: 24px; height: 24px; border-radius: 6px; flex: none;
+  background: linear-gradient(135deg, #9ec7fa, #056de8);
+}
+@keyframes chat-panel-pop {
+  from { opacity: 0; transform: translateY(10px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}

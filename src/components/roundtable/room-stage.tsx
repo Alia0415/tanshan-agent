@@ -1,7 +1,13 @@
 'use client';
-import { type DragEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { type DragEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import type { Roundtable } from '@/lib/roundtable/engine';
 import './room-stage.css';
+
+const emptySubscribe = () => () => {};
+function readMounted() {
+  return true;
+}
 
 export const TURN_MS = 16000;
 const seats = [
@@ -301,7 +307,7 @@ export function RoomStage({
   const time = useRef({ message: '', elapsed: 0, last: 0 });
   const completed = useRef('');
   const message = round.messages[Math.min(visible, round.messages.length) - 1];
-  const [settingsOpen, setSettingsOpen] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [guestAgents, setGuestAgents] = useState<GuestAgent[]>([]);
   const [draggingAgent, setDraggingAgent] = useState('');
@@ -432,85 +438,101 @@ export function RoomStage({
     if (elapsed < 14300) return '返回沙发';
     return '坐下';
   };
+  // 场景设置与 Agent 库整体传送进聊天框（#chat-controls-slot）；
+  // 挂载后才启用 Portal，避免服务端/客户端水合不一致报错
+  const mounted = useSyncExternalStore(emptySubscribe, readMounted, () => false);
+  const controlsSlot =
+    !mounted || typeof document === 'undefined'
+      ? null
+      : document.getElementById('chat-controls-slot');
+  const controls = (
+    <div className="room-controls chat-controls">
+      <div className="room-control-bar">
+        <div className="room-control-tabs">
+          <button
+            type="button"
+            onClick={() => {
+              setSettingsOpen(!settingsOpen);
+              setLibraryOpen(false);
+            }}
+            aria-expanded={settingsOpen}
+            aria-controls="room-settings"
+          >
+            场景设置
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setLibraryOpen(!libraryOpen);
+              setSettingsOpen(false);
+            }}
+            aria-expanded={libraryOpen}
+            aria-controls="agent-library"
+          >
+            Agent 库{presentGuests.length > 0 && <b>{presentGuests.length}</b>}
+          </button>
+        </div>
+        <span>{!round.messages.length ? '等待发起' : playing ? '圆桌进行中' : '已暂停'}</span>
+      </div>
+      {settingsOpen && (
+        <div id="room-settings">
+          {[
+            ['morning', '晨光共创室'],
+            ['strategy', '黄昏作战室'],
+            ['night', '夜间研究室'],
+          ].map(([id, name]) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={scene === id}
+              onClick={() => onScene(id)}
+            >
+              {name}
+            </button>
+          ))}
+          <button type="button" onClick={() => onScene(null)}>
+            跟随讨论进度
+          </button>
+        </div>
+      )}
+      {libraryOpen && (
+        <div id="agent-library" className="agent-library">
+          {agentLibrary.map((agent) => {
+            const joined = presentGuests.some((item) => item.id === agent.id);
+            return (
+              <button
+                key={agent.id}
+                type="button"
+                draggable={!joined}
+                disabled={joined}
+                onDragStart={(event) => {
+                  setDraggingAgent(agent.id);
+                  event.dataTransfer.setData(
+                    'application/x-round-agent',
+                    agent.id,
+                  );
+                  event.dataTransfer.setData('text/plain', agent.id);
+                  event.dataTransfer.effectAllowed = 'copy';
+                }}
+                onPointerDown={() => setDraggingAgent(agent.id)}
+                onDragEnd={(event) =>
+                  finishAgentDrag(agent.id, event.clientX, event.clientY)
+                }
+                onClick={() => addAgent(agent.id)}
+              >
+                <span className="agent-library-avatar" aria-hidden="true" />
+                <strong>{agent.name}</strong>
+                <em>{joined ? '已加入' : '拖入场景'}</em>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
   return (
     <section className="room-experience" aria-label="可视化圆桌">
-      <div className="room-controls">
-        <div className="room-control-bar">
-          <div className="room-control-tabs">
-            <button
-              type="button"
-              onClick={() => setSettingsOpen(!settingsOpen)}
-              aria-expanded={settingsOpen}
-              aria-controls="room-settings"
-            >
-              场景设置
-            </button>
-            <button
-              type="button"
-              onClick={() => setLibraryOpen(!libraryOpen)}
-              aria-expanded={libraryOpen}
-              aria-controls="agent-library"
-            >
-              Agent 库{presentGuests.length > 0 && <b>{presentGuests.length}</b>}
-            </button>
-          </div>
-          <span>{!round.messages.length ? '等待发起' : playing ? '圆桌进行中' : '已暂停'}</span>
-        </div>
-        {settingsOpen && (
-          <div id="room-settings">
-            {[
-              ['morning', '晨光共创室'],
-              ['strategy', '黄昏作战室'],
-              ['night', '夜间研究室'],
-            ].map(([id, name]) => (
-              <button
-                key={id}
-                type="button"
-                aria-pressed={scene === id}
-                onClick={() => onScene(id)}
-              >
-                {name}
-              </button>
-            ))}
-            <button type="button" onClick={() => onScene(null)}>
-              跟随讨论进度
-            </button>
-          </div>
-        )}
-        {libraryOpen && (
-          <div id="agent-library" className="agent-library">
-            {agentLibrary.map((agent) => {
-              const joined = presentGuests.some((item) => item.id === agent.id);
-              return (
-                <button
-                  key={agent.id}
-                  type="button"
-                  draggable={!joined}
-                  disabled={joined}
-                  onDragStart={(event) => {
-                    setDraggingAgent(agent.id);
-                    event.dataTransfer.setData(
-                      'application/x-round-agent',
-                      agent.id,
-                    );
-                    event.dataTransfer.setData('text/plain', agent.id);
-                    event.dataTransfer.effectAllowed = 'copy';
-                  }}
-                  onPointerDown={() => setDraggingAgent(agent.id)}
-                  onDragEnd={(event) =>
-                    finishAgentDrag(agent.id, event.clientX, event.clientY)
-                  }
-                  onClick={() => addAgent(agent.id)}
-                >
-                  <span className="agent-library-avatar" aria-hidden="true" />
-                  <strong>{agent.name}</strong>
-                  <em>{joined ? '已加入' : '拖入场景'}</em>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      {controlsSlot && createPortal(controls, controlsSlot)}
       <div
         ref={worldRef}
         className={'room-world room-' + scene}

@@ -15,6 +15,8 @@
   --canvas: #f6f7f8;
   --success: #18a058;
   --shadow: 0 8px 28px rgba(18, 18, 18, 0.06);
+  --serif: "Noto Serif SC", Georgia, "Songti SC", "STSong", "SimSun", serif;
+  --sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -863,3 +865,182 @@ a:focus-visible {
 
 .reading-scope .intent-bubbles { display: flex; flex-wrap: wrap; gap: 10px; list-style: none; margin: 16px 0 0; padding: 0; }
 .reading-scope .intent-bubbles > li { max-width: 100%; padding: 10px 18px; border: 1px solid var(--blue-line); border-radius: 22px; background: var(--blue-soft); color: var(--blue-dark); font-size: 15px; font-weight: 500; line-height: 1.6; overflow-wrap: anywhere; }
+
+/* ===== 月亮唱片机：热点问题像歌词一样滚动 ===== */
+/* 夜间：深藏蓝夜空整页背景，米白文字 + 奶油唱片；日出：暖橙天空，深暖棕文字 + 暖金太阳唱片 */
+.moon-page {
+  position: relative;
+  --mq-text: #f6f1e4;
+  --mq-soft: rgba(246, 241, 228, 0.64);
+  --mq-faint: rgba(246, 241, 228, 0.45);
+  --mq-accent: #e8cf9a;
+  --mq-error: #ffb28c;
+  --mq-border: rgba(246, 241, 228, 0.32);
+  --mq-btn-bg: #f6f1e4;
+  --mq-btn-ink: #16244a;
+  --mq-cta-hover: #ffffff;
+  background: #0d1a38 url("/sea/night-bg.jpg") center bottom / cover no-repeat;
+}
+/* 顶栏（搜索栏所在行）保留原本白色风格 */
+.moon-page .topbar { background: rgba(255, 255, 255, 0.96); border-bottom: 1px solid #e5e7eb; }
+
+
+.moon-stage {
+  width: min(1460px, calc(100% - 36px));
+  margin: 0 auto;
+  padding: 30px 0 44px;
+  min-height: calc(100vh - 58px);
+  display: grid;
+  grid-template-columns: minmax(300px, 1.05fr) minmax(330px, 0.9fr) minmax(320px, 0.95fr);
+  gap: clamp(18px, 3vw, 44px);
+  align-items: center;
+  position: relative;
+  z-index: 1;
+  padding-bottom: clamp(160px, 24vh, 240px);
+}
+
+/* 左侧：歌词式热点问题 */
+.moon-lyrics { display: flex; flex-direction: column; gap: 14px; min-width: 0; align-self: center; }
+.moon-filter { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--mq-accent); }
+.moon-filter button {
+  border: 1px solid var(--mq-border); background: transparent; color: var(--mq-soft);
+  padding: 5px 13px; border-radius: 999px; cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+.moon-filter button.selected, .moon-filter button:hover { background: var(--mq-btn-bg); color: var(--mq-btn-ink); border-color: var(--mq-btn-bg); }
+.moon-filter strong { color: var(--mq-text); font-weight: 600; margin-left: 4px; }
+.moon-notice { color: var(--mq-soft); font-size: 14px; line-height: 2; font-family: var(--serif); }
+.moon-notice button { margin-top: 8px; border: 1px solid var(--mq-text); background: transparent; color: var(--mq-text); padding: 7px 18px; border-radius: 999px; cursor: pointer; }
+.moon-lyrics-window {
+  position: relative;
+  height: 480px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 12%, #000 88%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 12%, #000 88%, transparent 100%);
+}
+.moon-lyrics-track { position: absolute; inset: 0; display: flex; flex-direction: column; transition: transform 0.65s cubic-bezier(0.22, 0.9, 0.28, 1); }
+.moon-line {
+  flex: none;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+  color: var(--mq-text);
+  font-family: var(--serif);
+  font-size:  19px;
+  line-height: 1.55;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+  transition: opacity 0.45s ease, font-size 0.45s ease, letter-spacing 0.45s ease;
+  opacity: 0.1;
+}
+.moon-line[data-distance="2"] { opacity: 0.2; }
+.moon-line[data-distance="1"] { opacity: 0.38; }
+.moon-line.current { opacity: 1; font-size: 23px; font-weight: 600; letter-spacing: 0.01em; text-shadow: 0 1px 14px rgba(0, 0, 0, 0.18); }
+.moon-line:hover { opacity: 0.8; }
+.moon-controls { display: flex; align-items: center; gap: 12px; }
+.moon-controls button {
+  display: grid; place-items: center;
+  width: 38px; height: 38px; border-radius: 50%;
+  border: 1px solid var(--mq-border); background: transparent; color: var(--mq-text); cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.moon-controls button:hover:not(:disabled) { background: var(--mq-btn-bg); color: var(--mq-btn-ink); border-color: var(--mq-btn-bg); }
+.moon-controls button:disabled { opacity: 0.35; cursor: not-allowed; }
+.moon-controls .moon-toggle { width: 46px; height: 46px; border-color: var(--mq-btn-bg); background: var(--mq-btn-bg); color: var(--mq-btn-ink); }
+.moon-controls .moon-toggle:hover { transform: scale(1.08); }
+.moon-controls .moon-toggle:active { transform: scale(0.94); }
+.moon-controls-label { color: var(--mq-accent); font-size: 12px; }
+
+/* 中间：转动的唱片（图片来自参考图，播放时旋转、暂停时停转）
+   唱片下半部沉入海平面：.moon-horizon-veil 以半透明海色覆盖，上方保持露出 */
+.moon-disc { position: relative; display: grid; place-items: center; align-self: center; }
+.moon-spin {
+  width: min(388px, 29vw);
+  aspect-ratio: 1;
+  animation: moon-spin 42s linear infinite;
+}
+.moon-spin.paused { animation-play-state: paused; }
+.moon-disc-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 30px 70px rgba(5, 12, 30, 0.6), 0 0 80px rgba(245, 233, 200, 0.18);
+}
+.moon-horizon-veil {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(10, 24, 52, 0) 55%,
+    rgba(10, 24, 52, 0.38) 70%,
+    rgba(7, 17, 40, 0.78) 88%,
+    rgba(5, 13, 32, 0.92) 100%
+  );
+}
+@keyframes moon-spin { to { transform: rotate(360deg); } }
+
+/* 右侧：第一条回复的杂志式排版 */
+.moon-answer { display: flex; flex-direction: column; gap: 14px; min-width: 0; align-self: center; font-family: var(--serif); }
+.moon-answer-kicker { color: var(--mq-accent); font-size: 12px; letter-spacing: 1.5px; }
+.moon-answer h2 { margin: 0; font-size: 26px; line-height: 1.5; font-weight: 700; color: var(--mq-text); letter-spacing: 0.01em; }
+.moon-answer h2 a { color: inherit; text-decoration: none; }
+.moon-answer h2 a:hover { color: var(--mq-accent); }
+.moon-answer-hint { margin: 0; color: var(--mq-accent); font-size: 14px; line-height: 2; }
+.moon-answer-error { color: var(--mq-error); }
+.moon-answer-body {
+  border-top: 1px solid var(--mq-border);
+  padding-top: 16px;
+}
+.moon-answer-body p {
+  margin: 0;
+  color: var(--mq-text);
+  font-size: 15.5px;
+  line-height: 2.05;
+  text-indent: 2em;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 9;
+  overflow: hidden;
+}
+.moon-answer-meta {
+  margin-top: 12px;
+  color: var(--mq-accent);
+  font-size: 13px;
+  text-align: right;
+}
+.moon-answer-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 4px; }
+.moon-answer-cta {
+  display: inline-flex; align-items: center;
+  padding: 11px 22px; border-radius: 999px;
+  background: var(--mq-btn-bg); color: var(--mq-btn-ink);
+  font-family: var(--sans); font-size: 13.5px; font-weight: 600;
+  text-decoration: none;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.15s;
+}
+.moon-answer-cta:hover { transform: scale(1.05); background: var(--mq-cta-hover); }
+.moon-answer-cta:active { transform: scale(0.96); }
+.moon-answer-origin { color: var(--mq-accent); font-family: var(--sans); font-size: 12.5px; text-decoration: none; border-bottom: 1px solid var(--mq-border); padding-bottom: 2px; }
+.moon-answer-origin:hover { color: var(--mq-text); border-color: var(--mq-text); }
+.moon-answer-footnote { margin-top: 10px; color: var(--mq-faint); font-family: var(--sans); font-size: 11px; }
+
+.home-label { display: inline-flex; gap: 8px; }
+
+@media (max-width: 1150px) {
+  .moon-stage { grid-template-columns: 1fr; justify-items: center; text-align: center; padding-top: 20px; padding-bottom: 170px; }
+  .moon-lyrics { width: min(560px, 100%); }
+  .moon-answer { width: min(560px, 100%); text-align: left; }
+  .moon-spin { width: min(300px, 64vw); }
+  .moon-lyrics-window { height: 480px; }
+  .moon-line { font-size: 17px; }
+  .moon-line.current { font-size: 19px; }
+}

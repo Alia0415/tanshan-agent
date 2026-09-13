@@ -28,7 +28,7 @@ async function api<T>(path: string, method = "GET", payload?: unknown) {
 export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?: string }) {
   const [round, setRound] = useState<Roundtable | null>(null);
   const [question, setQuestion] = useState(initialQuestion);
-  const [scene, setScene] = useState<string | null>(null);
+  const [scene, setScene] = useState<string | null>("night");
   const [playing, setPlaying] = useState(false);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -97,7 +97,7 @@ export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?
             }
             visible={round?.messages.length ?? 0}
             playing={playing && !busy && !complete}
-            scene={scene ?? (complete ? "night" : "morning")}
+            scene={scene ?? "night"}
             onScene={setScene}
             onTurnEnd={() => void advanceOnce()}
           />
@@ -139,6 +139,8 @@ export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?
           )}
         </div>
         <aside className="roundtable-live-chat" aria-label="圆桌群聊">
+          {/* 场景设置 / Agent 库的承载槽：RoomStage 通过 portal 渲染到这里 */}
+          <div id="chat-controls-slot" className="chat-controls-slot" />
           {round ? (
             <WeChatChat
               round={round}
