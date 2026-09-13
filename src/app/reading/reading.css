@@ -1060,14 +1060,18 @@ a:focus-visible {
   }
   .moon-filter button:nth-child(2) { display: none; }
   .moon-controls-label { display: none; }
-  .moon-controls { gap: 9px; }
+  /* 控制按钮挂在月亮正下方（屏幕左上） */
+  .moon-controls { position: absolute; top: 298px; left: 12px; gap: 9px; z-index: 2; }
   .moon-controls button { width: 34px; height: 34px; }
   .moon-controls .moon-toggle { width: 40px; height: 40px; }
-  .moon-lyrics-window { height: 318px; -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 8%, #000 92%, transparent 100%); mask-image: linear-gradient(180deg, transparent 0%, #000 8%, #000 92%, transparent 100%); }
+  /* 热点窗口整体右上移：只露 3 行，避开月亮及其光晕 */
+  .moon-lyrics { top: 12px; left: 164px; right: 10px; gap: 6px; }
+  .moon-disc-img { box-shadow: 0 18px 40px rgba(5, 12, 30, 0.5), 0 0 30px rgba(245, 233, 200, 0.16); }
+  .moon-lyrics-window { height: 196px; -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 6%, #000 94%, transparent 100%); mask-image: linear-gradient(180deg, transparent 0%, #000 6%, #000 94%, transparent 100%); }
   .moon-lyrics-track { transform: translateY(calc(50% - (var(--moon-idx, 0) * 64px + 32px))); }
   .moon-line { height: 64px; font-size: 14px; }
   .moon-line.current { font-size: 16px; }
-  .moon-answer { width: 100%; margin-top: 356px; }
+  .moon-answer { width: 100%; margin-top: 352px; }
   .moon-answer h2 { font-size: 21px; }
   .moon-answer-body p { font-size: 14.5px; -webkit-line-clamp: 7; }
 }

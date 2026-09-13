@@ -200,7 +200,7 @@ export function WeChatIntro({
       </header>
       <div className="wechat-body wechat-intro">
         <Sparkles size={30} className="wechat-intro-icon" />
-        <h3>把一个问题交给几个立场</h3>
+        <h3>跟不同观点的代表谈谈</h3>
         <p>真实检索知乎帖子，生成不同立场的 Agent 开一场可插话的圆桌。</p>
         <textarea
           aria-label="本场讨论的问题"

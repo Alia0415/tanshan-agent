@@ -208,12 +208,13 @@
     grid-template-columns: none; grid-template-rows: none;
     gap: 0; margin: 0; padding: 0; flex: 1; min-height: 0;
   }
-  .roundtable-live-stage { flex: 0 0 42%; min-height: 0; }
+  /* 场景保持 1672/941 原始比例、宽度撑满，聊天框填充剩余空白 */
+  .roundtable-live-stage { flex: none; min-height: 0; }
   .roundtable-live-stage .room-experience {
-    flex: none; height: 100%; margin: 0;
+    flex: none; height: auto; margin: 0;
     border: 0; border-radius: 0; box-shadow: none;
   }
-  .roundtable-live-layout .room-world { width: 100%; height: 100%; max-height: none; aspect-ratio: auto; margin: 0; }
+  .roundtable-live-layout .room-world { width: 100%; height: auto; max-height: none; aspect-ratio: 1672/941; margin: 0; }
   .room-caption { display: none; }
   .roundtable-summary { display: none; }
   .roundtable-live-chat { flex: 1; min-height: 0; height: auto; }
