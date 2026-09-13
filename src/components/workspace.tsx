@@ -25,6 +25,7 @@ import { MAX_CLARIFICATION_ROUNDS, type Context, type ContextPatch, type Session
 import { ContextFields, ContextTags } from "./context-fields";
 import { AnswerCard } from "./answer-card";
 import { WaveProgressFloat } from "./wave-progress";
+import { SearchProgress } from "./search-progress";
 
 type Result = { session: Session; auto_answer?: boolean };
 const STORAGE_KEY = "wenshan.agent-session-v2";
@@ -908,11 +909,11 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
                   </div>
                 </section>
               ) : isWorking ? (
-                <section className="panel progress-panel" aria-live="polite">
+                <section className="panel progress-panel">
                   <span className="progress-orbit">
                     <Mountain size={31} />
                   </span>
-                  <h2>
+                  <h2 aria-live="polite">
                     {connectionLost
                       ? "连接暂时中断"
                       : session.stage === "searching"
@@ -927,6 +928,11 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
                         : "好的答案需要一点时间，我们正在核对资料与引用。"}
                   </p>
                   <ContextTags context={session.confirmed_context} />
+                  <SearchProgress
+                    key={`${session.session_id}:${session.context_version}`}
+                    searching={session.stage === "searching"}
+                    disconnected={connectionLost}
+                  />
                   {connectionLost ? (
                     <button
                       type="button"
@@ -939,13 +945,7 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
                       重新连接
                       <RotateCcw size={16} />
                     </button>
-                  ) : (
-                    <div className="progress-dots">
-                      <i />
-                      <i />
-                      <i />
-                    </div>
-                  )}
+                  ) : null}
                   <button className="text-button" type="button" onClick={edit}>
                     修改条件
                   </button>
