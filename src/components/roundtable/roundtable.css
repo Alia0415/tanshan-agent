@@ -225,3 +225,20 @@
   html:has(.roundtable-page) { overflow: hidden; }
   html:has(.roundtable-page) body { overflow: hidden; }
 }
+
+/* 手机端：场景设置 / Agent 库按钮挂在聊天框左上角（微信标题栏下方），面板向下弹出 */
+@media (max-width: 850px) {
+  .chat-controls-slot { top: 56px; left: 10px; right: auto; bottom: auto; }
+  .chat-controls-slot .room-control-bar { flex-wrap: wrap; gap: 6px; }
+  .chat-controls-slot .room-control-bar > span { font-size: 10px; padding: 3px 8px; }
+  .chat-controls-slot #room-settings,
+  .chat-controls-slot .agent-library {
+    top: calc(100% + 8px);
+    bottom: auto;
+    left: 0;
+    right: auto;
+    width: 236px;
+    max-height: 40vh;
+  }
+  .chat-controls-slot #room-settings { grid-template-columns: 1fr; }
+}
