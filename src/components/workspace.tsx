@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { MAX_CLARIFICATION_ROUNDS, type Context, type ContextPatch, type Session, type SessionSummary } from "@/lib/domain/types";
 import { ContextFields, ContextTags } from "./context-fields";
+import { BookmarkLibraryButton } from "./bookmarks";
 import { AnswerCard } from "./answer-card";
 import { WaveProgressFloat } from "./wave-progress";
 import { SearchProgress } from "./search-progress";
@@ -641,6 +642,7 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
             </span>
             <MoreHorizontal size={16} aria-hidden="true" />
           </button>
+          <BookmarkLibraryButton />
           <Link className="side-user" href="/me">
             <Image className="side-avatar zhihu" src="/zhihu-official.ico" alt="" width={20} height={20} unoptimized />
             <span className="side-user-name">我的知乎</span>

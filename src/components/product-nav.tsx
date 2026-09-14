@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const products = [
-  { href: "/bookmarks", label: "我的收藏" },
   { href: "/", label: "Agent 问答" },
   { href: "/reading", label: "阅读助手" },
   { href: "/roundtable", label: "观点圆桌" },

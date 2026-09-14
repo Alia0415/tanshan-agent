@@ -116,7 +116,7 @@ export function AnswerCard({
         </p>
         {posts.length ? (
           posts.map((source) => (
-            <div key={source.id}>
+            <div key={source.id} className="bookmark-post-card">
             <a
               id={`source-${answer.id}-${source.id}`}
               className="source-card"
@@ -148,7 +148,7 @@ export function AnswerCard({
                 打开知乎原帖 <ArrowUpRight size={15} />
               </span>
             </a>
-            <BookmarkButton post={{ url: source.url, title: source.title, author: source.author || "", excerpt: previewExcerpt(source) }} />
+            <BookmarkButton corner post={{ url: source.url, title: source.title, author: source.author || "", excerpt: previewExcerpt(source) }} />
             </div>
           ))
         ) : (
