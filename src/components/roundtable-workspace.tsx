@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Mountain } from "lucide-react";
 import type { Roundtable } from "@/lib/roundtable/engine";
 
@@ -26,12 +26,23 @@ async function api<T>(path: string, method = "GET", payload?: unknown) {
   return data as T;
 }
 export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?: string }) {
+  const joiningGuest = useRef(false);
+  const [stageSummaries, setStageSummaries] = useState<Record<string, string>>({});
+  const receiveSummaries = useCallback((result: Record<string, string>) => {
+    setStageSummaries((current) => ({ ...current, ...result }));
+  }, []);
   const [round, setRound] = useState<Roundtable | null>(null);
   const [question, setQuestion] = useState(initialQuestion);
   const [scene, setScene] = useState<string | null>("night");
   const [playing, setPlaying] = useState(false);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  // Fetch the next turn while the current scene animates, instead of waiting for it.
+  useEffect(() => {
+    if (!playing || busy || !round || round.scheduler.state === "complete") return;
+    const timer = setTimeout(() => void advanceOnce(), 800);
+    return () => clearTimeout(timer);
+  });
   async function start() {
     if (!question.trim() || busy) return;
     setBusy("正在检索并组建圆桌");
@@ -78,6 +89,22 @@ export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?
       setBusy("");
     }
   }
+  async function invite(guestId: string): Promise<boolean> {
+    if (!round || busy || joiningGuest.current) return false;
+    joiningGuest.current = true;
+    setBusy("Agent 正在加入讨论");
+    setError("");
+    try {
+      setRound(await api<Roundtable>(`/api/roundtables/${round.id}/guests`, "POST", { guestId }));
+      return true;
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "加入失败，请重新拖入。");
+      return false;
+    } finally {
+      joiningGuest.current = false;
+      setBusy("");
+    }
+  }
   const complete = round?.scheduler.state === "complete";
   return (
     <main className="roundtable-page">
@@ -88,6 +115,10 @@ export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?
       <div className="roundtable-live-layout">
         <div className="roundtable-live-stage">
           <RoomStage
+            summaries={stageSummaries}
+            key={round?.id ?? "empty"}
+            onJoinGuest={invite}
+            canJoinGuest={!!round && !busy}
             round={
               round ?? {
                 roles: [],
@@ -96,10 +127,10 @@ export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?
               }
             }
             visible={round?.messages.length ?? 0}
-            playing={playing && !busy && !complete}
+            playing={playing && !complete}
             scene={scene ?? "night"}
             onScene={setScene}
-            onTurnEnd={() => void advanceOnce()}
+            onTurnEnd={() => {}}
           />
           {round && (
             <section className="roundtable-summary">
@@ -141,6 +172,7 @@ export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?
         <aside className="roundtable-live-chat" aria-label="圆桌群聊">
           {round ? (
             <WeChatChat
+              onSummaries={receiveSummaries}
               round={round}
               busy={busy}
               error={error}

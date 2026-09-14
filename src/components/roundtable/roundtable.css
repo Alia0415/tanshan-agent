@@ -269,3 +269,27 @@
 .room-theme-controls #room-settings {
   margin-top: 0;
 }
+
+.wechat-expand { display: block; border: 0; padding: 4px 0; background: transparent; color: #365b91; font-size: 12px; cursor: pointer; }
+.wechat-expand:focus-visible { outline: 2px solid #056de8; outline-offset: 2px; }
+
+.wechat-takeaway p { overflow-wrap: anywhere; }
+.wechat-takeaway b { margin-right: 6px; color: #365b91; font-size: 12px; }
+.wechat-bubble .wechat-claim { font-weight: 600; margin-bottom: 5px; }
+.wechat-evidence { color: #555; font-size: 12px; line-height: 1.55; }
+.wechat-summary-missing { color: #777; font-size: 12px; }
+
+/* Initial request: indeterminate until the server responds. */
+.wechat-start-progress { width: 100%; max-width: 260px; display: grid; gap: 10px; }
+.wechat-start-progress-track { height: 6px; overflow: hidden; border-radius: 999px; background: #d7e6dd; }
+.wechat-start-progress-fill { display: block; width: 40%; height: 100%; border-radius: inherit; background: #07c160; animation: wechat-start-loading 2s ease-in-out infinite; }
+.wechat-intro .wechat-start-progress-hint { font-size: 11px; color: #707870; }
+@keyframes wechat-start-loading {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wechat-start-progress-fill { animation: none; width: 100%; opacity: 0.6; }
+}
+.wechat-viewpoint { display: grid; gap: 3px; }
+.wechat-viewpoint p { white-space: pre-line; }

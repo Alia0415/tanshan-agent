@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, Send, Sparkles } from "lucide-react";
+import { conciseClaim } from "@/lib/roundtable/brief";
 import type { Roundtable } from "@/lib/roundtable/engine";
 
 const phaseDividers: Record<string, string> = {
@@ -27,6 +28,7 @@ export function WeChatChat({
   onSend,
   onAdvance,
   onTogglePlaying,
+  onSummaries,
 }: {
   round: Roundtable;
   busy: string;
@@ -35,8 +37,33 @@ export function WeChatChat({
   onSend: (content: string) => void;
   onAdvance: () => void;
   onTogglePlaying: () => void;
+  onSummaries?: (summaries: Record<string, string>) => void;
 }) {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [draft, setDraft] = useState("");
+  const [summaries, setSummaries] = useState<Record<string, string>>({});
+  const [summaryError, setSummaryError] = useState(false);
+  const requested = useRef(new Set<string>());
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    const ids = round.messages.filter((message) =>
+      message.speaker !== "user" && !conciseClaim(message) &&
+      !summaries[message.id] && !requested.current.has(message.id)
+    ).map((message) => message.id);
+    if (!ids.length) return;
+    ids.forEach((id) => requested.current.add(id));
+    void fetch("/api/roundtables/" + round.id + "/briefs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+      signal: AbortSignal.timeout(150_000),
+    }).then(async (response) => {
+      if (!response.ok) throw new Error("Summary failed");
+      const result = await response.json() as Record<string, string>;
+      setSummaries((current) => ({ ...current, ...result }));
+      onSummaries?.(result);
+    }).catch(() => setSummaryError(true));
+  }, [round.id, round.messages, summaries, retry, onSummaries]);
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
@@ -68,6 +95,7 @@ export function WeChatChat({
         {round.messages.map((message, index) => {
           const previous = round.messages[index - 1];
           const isUser = message.speaker === "user";
+          const viewpoint = conciseClaim(message) || summaries[message.id];
           const parent = message.replyTo
             ? round.messages.find((item) => item.id === message.replyTo)
             : undefined;
@@ -100,7 +128,23 @@ export function WeChatChat({
                           : parent.content}
                       </blockquote>
                     )}
-                    <p>{message.content}</p>
+                    {!isUser ? (
+                      <>
+                        <div className="wechat-takeaway">
+                          <p className="wechat-claim"><b>议题</b>{message.brief?.topic || round.question}</p>
+                          <div className="wechat-viewpoint"><b>观点</b>{viewpoint ? <p>{viewpoint}</p> : summaryError ? <button type="button" className="wechat-expand" onClick={() => { requested.current.clear(); setSummaryError(false); setRetry((value) => value + 1); }}>重新生成观点</button> : <span role="status" aria-label="正在总结观点"><LoaderCircle size={14} className="spin" /></span>}</div>
+                        </div>
+
+                        <button type="button" className="wechat-expand" aria-expanded={Boolean(expanded[message.id])} aria-controls={"message-" + message.id} onClick={() => setExpanded((current) => ({ ...current, [message.id]: !current[message.id] }))}>
+                          {expanded[message.id] ? "收起详情" : "展开完整论证"}
+                        </button>
+                        <div id={"message-" + message.id} hidden={!expanded[message.id]}>
+                          {message.brief?.evidence && <p className="wechat-evidence"><b>{message.phase === "opening" ? "范围" : "论据"}：</b>{message.brief.evidence}</p>}
+                          {viewpoint !== message.content && <p>{message.content}</p>}
+                        </div>
+
+                      </>
+                    ) : <p>{message.content}</p>}
                     {message.citations.length > 0 && (
                       <div className="wechat-cites">
                         {message.citations.map((id) => {
@@ -138,7 +182,7 @@ export function WeChatChat({
           type="button"
           className="wechat-tool"
           onClick={onTogglePlaying}
-          disabled={Boolean(busy) || complete}
+          disabled={complete}
         >
           {playing ? "暂停自动讨论" : "自动讨论"}
         </button>
@@ -221,7 +265,15 @@ export function WeChatIntro({
         >
           {busy ? <LoaderCircle size={16} className="spin" /> : "组局"}
         </button>
-        {busy && <div className="wechat-typing">正在检索并组建圆桌…</div>}
+        {busy && (
+          <div className="wechat-start-progress">
+            <div className="wechat-typing" role="status">观察员们正在集结…</div>
+            <div className="wechat-start-progress-track" role="progressbar" aria-label="观察员们正在集结">
+              <span className="wechat-start-progress-fill" />
+            </div>
+            <p className="wechat-start-progress-hint">大家正带着观点赶来，入座后就开聊～</p>
+          </div>
+        )}
         {error && <p className="wechat-error" role="alert">{error}</p>}
       </div>
     </div>

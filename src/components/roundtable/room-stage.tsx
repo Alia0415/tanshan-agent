@@ -1,8 +1,9 @@
 'use client';
-import { type DragEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { type DragEvent, useEffect, useRef, useState } from 'react';
 
 import type { Roundtable } from '@/lib/roundtable/engine';
 import './room-stage.css';
+import { conciseClaim } from '@/lib/roundtable/brief';
 
 export const TURN_MS = 16000;
 const seats = [
@@ -283,67 +284,55 @@ function Sprite({
 }
 
 export function RoomStage({
+  summaries = {},
   round,
   visible,
   playing,
   scene,
   onScene,
   onTurnEnd,
+  onJoinGuest,
+  canJoinGuest,
 }: {
+  summaries?: Record<string, string>;
   round: Pick<Roundtable, "roles" | "messages" | "scheduler">;
   visible: number;
   playing: boolean;
   scene: string;
   onScene: (scene: string | null) => void;
   onTurnEnd: () => void;
+  onJoinGuest: (id: string) => Promise<boolean>;
+  canJoinGuest: boolean;
 }) {
   const [clock, setClock] = useState(0);
   const [playhead, setPlayhead] = useState({ message: '', elapsed: 0 });
   const time = useRef({ message: '', elapsed: 0, last: 0 });
   const completed = useRef('');
   const message = round.messages[Math.min(visible, round.messages.length) - 1];
+  const shortClaim = message ? conciseClaim(message) || summaries[message.id] : undefined;
+  const bubbleText = shortClaim
+    ? shortClaim.trim().replace(/[。！？!?；;\n\r]+/g, '，').replace(/，+$/g, '') + '。'
+    : undefined;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [guestAgents, setGuestAgents] = useState<GuestAgent[]>([]);
   const [draggingAgent, setDraggingAgent] = useState('');
   const worldRef = useRef<HTMLDivElement>(null);
   const [reduced, setReduced] = useState(false);
-  function addAgent(id: string, position?: { x: number; y: number }) {
+  const pendingGuest = useRef(false);
+  async function addAgent(id: string, position?: { x: number; y: number }) {
     const agent = agentLibrary.find((item) => item.id === id);
-    if (!agent || guestAgents.some((item) => item.id === id)) return;
+    if (!canJoinGuest || pendingGuest.current || !agent || guestAgents.some((item) => item.id === id)) return;
     const spot = position ?? guestSpots[guestAgents.length % guestSpots.length];
-    setGuestAgents((current) => [...current, { ...agent, ...spot }]);
-  }
-  // Guests walk in by themselves when it is their turn to interject; the
-  // presence is derived from the transcript instead of effect-driven state.
-  const summonedGuests = useMemo(() => {
-    const seen = new Set<string>();
-    for (
-      let i = 0;
-      i < Math.min(visible, round.messages.length);
-      i++
-    ) {
-      const speaker = round.messages[i].speaker;
-      if (agentLibrary.some((agent) => agent.id === speaker))
-        seen.add(speaker);
+    pendingGuest.current = true;
+    try {
+      if (await onJoinGuest(id))
+        setGuestAgents((current) => [...current, { ...agent, ...spot }]);
+    } finally {
+      pendingGuest.current = false;
     }
-    return [...seen].map((id, index) => {
-      const agent = agentLibrary.find((item) => item.id === id)!;
-      return { ...agent, ...guestSpots[index % guestSpots.length] };
-    });
-  }, [round.messages, visible]);
-  const presentGuests = useMemo(() => {
-    const manual = new Set(guestAgents.map((agent) => agent.id));
-    const auto = summonedGuests
-      .filter((agent) => !manual.has(agent.id))
-      .map((agent, index) => ({
-        ...agent,
-        ...guestSpots[
-          (guestAgents.length + index) % guestSpots.length
-        ],
-      }));
-    return [...guestAgents, ...auto];
-  }, [guestAgents, summonedGuests]);
+  }
+  const presentGuests = guestAgents;
   function positionInWorld(clientX: number, clientY: number) {
     const bounds = worldRef.current?.getBoundingClientRect();
     if (
@@ -366,6 +355,11 @@ export function RoomStage({
     };
   }
   function finishAgentDrag(id: string, clientX: number, clientY: number) {
+    const target = document.elementFromPoint(clientX, clientY);
+    if (target?.closest(".room-controls")) {
+      setDraggingAgent('');
+      return;
+    }
     const position = positionInWorld(clientX, clientY);
     if (position) addAgent(id, position);
     setDraggingAgent('');
@@ -491,8 +485,8 @@ export function RoomStage({
               <button
                 key={agent.id}
                 type="button"
-                draggable={!joined}
-                disabled={joined}
+                draggable={!joined && canJoinGuest}
+                disabled={joined || !canJoinGuest}
                 onDragStart={(event) => {
                   setDraggingAgent(agent.id);
                   event.dataTransfer.setData(
@@ -506,7 +500,6 @@ export function RoomStage({
                 onDragEnd={(event) =>
                   finishAgentDrag(agent.id, event.clientX, event.clientY)
                 }
-                onClick={() => addAgent(agent.id)}
               >
                 <span className="agent-library-avatar" aria-hidden="true" />
                 <strong>{agent.name}</strong>
@@ -587,7 +580,7 @@ export function RoomStage({
                   ? 'seated'
                   : 'standing')
               }
-              style={{ left: x + '%', top: y + '%', zIndex: Math.round(y) }}
+              style={{ left: x + '%', top: y + '%', zIndex: action === '发言中' ? 95 : Math.round(y) }}
               data-action={action}
             >
               <div
@@ -602,6 +595,11 @@ export function RoomStage({
                   walking={direction}
                 />
               </div>
+              {active && action === '发言中' && bubbleText && (
+                <div className="room-speech" role="status" aria-label={role.name + '的观点'} key={message.id}>
+                  {bubbleText}
+                </div>
+              )}
               <span className="room-name">{role.name}</span>
             </div>
           );
@@ -624,6 +622,11 @@ export function RoomStage({
                 walking="walk-front"
               />
             </div>
+            {agent.id === message?.speaker && state(true, index) === '发言中' && bubbleText && (
+              <div className="room-speech" role="status" aria-label={agent.name + '的观点'} key={message.id}>
+                {bubbleText}
+              </div>
+            )}
             <span className="room-name">{agent.name}</span>
           </div>
         ))}
