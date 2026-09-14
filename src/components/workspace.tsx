@@ -494,13 +494,6 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
     session?.answers.filter(
       (answer) => answer.context_version !== session.context_version,
     ) || [];
-  const step = !session
-    ? 0
-    : session.stage === "clarifying"
-      ? 1
-      : session.stage === "ready"
-        ? 2
-        : 3;
   const feedback = async (
     answerId: string,
     type: "helpful" | "irrelevant",
@@ -857,24 +850,6 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
             </section>
           ) : (
             <>
-              <div className="flow-header">
-                <span className="eyebrow">一步一步，让问题更清晰</span>
-                <ol className="flow-steps">
-                  {["提出问题", "聚焦需求", "确认条件", "查看答案"].map(
-                    (label, index) => (
-                      <li
-                        className={index <= step ? "reached" : ""}
-                        key={label}
-                      >
-                        <span>
-                          {index < step ? <Check size={12} /> : index + 1}
-                        </span>
-                        {label}
-                      </li>
-                    ),
-                  )}
-                </ol>
-              </div>
               <div className="user-message">
                 <span className="user-label">你的问题</span>
                 <h1>{session.original_question}</h1>
