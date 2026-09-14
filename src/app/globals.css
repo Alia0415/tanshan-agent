@@ -2823,3 +2823,51 @@ dialog.delete-dialog { position: fixed; inset: 0; margin: auto; width: 470px; ma
 .delete-dialog button:focus-visible { outline: 2px solid #056de8; outline-offset: 3px; }
 .bookmark-post-card { position: relative; }
 .bookmark-post-card .source-card strong { display: block; padding-right: 100px; }
+
+.condition-tag-editor .field-label > .condition-supplement {
+  min-height: 40px;
+  padding: 8px 12px;
+  line-height: 22px;
+}
+
+.question-roundtable-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  flex-wrap: wrap;
+}
+.question-roundtable-row h1 {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+.question-roundtable-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid #cbdcf3;
+  border-radius: 10px;
+  background: #fff;
+  color: #056de8;
+  font-size: 13px;
+  text-decoration: none;
+}
+.question-roundtable-link:hover {
+  background: #eaf3ff;
+}
+.question-roundtable-link:focus-visible {
+  outline: 2px solid #056de8;
+  outline-offset: 3px;
+}
+@media (max-width: 600px) {
+  .question-roundtable-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .question-roundtable-row h1 {
+    flex: auto;
+  }
+}

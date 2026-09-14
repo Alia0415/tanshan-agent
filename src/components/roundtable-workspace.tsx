@@ -139,8 +139,6 @@ export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?
           )}
         </div>
         <aside className="roundtable-live-chat" aria-label="圆桌群聊">
-          {/* 场景设置 / Agent 库的承载槽：RoomStage 通过 portal 渲染到这里 */}
-          <div id="chat-controls-slot" className="chat-controls-slot" />
           {round ? (
             <WeChatChat
               round={round}
@@ -156,6 +154,7 @@ export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?
               question={question}
               setQuestion={setQuestion}
               busy={busy}
+              error={error}
               onStart={() => void start()}
             />
           )}

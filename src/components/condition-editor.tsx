@@ -14,7 +14,6 @@ export function ConditionEditor({ label, answerId, sources, history, busy, onSav
   const [located, setLocated] = useState<Located | null>(initial);
   const [selected, setSelected] = useState<string[]>(initial ? history[initial.history_index]?.selected || [] : []);
   const [text, setText] = useState(initial ? history[initial.history_index]?.free_text || "" : "");
-  const [showOther, setShowOther] = useState(false);
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
   useEffect(() => {
@@ -54,16 +53,11 @@ export function ConditionEditor({ label, answerId, sources, history, busy, onSav
               ? current.includes(option) ? current.filter((item) => item !== option) : [...current, option]
               : [option])}>{option}</button>)}</div>
       </fieldset>
-      {text && !showOther && <p className="field-hint">已保留补充：{text}
-        <button type="button" className="text-button" disabled={busy} onClick={() => setText("")}>移除</button>
-      </p>}
-      <button type="button" className="text-button" disabled={busy} aria-expanded={showOther}
-        onClick={() => setShowOther(!showOther)}>{showOther ? "收起补充" : "其他／补充（选填）"}</button>
-      {showOther && <label className="field-label">补充你的需求
-        <textarea value={text} maxLength={2000} disabled={busy}
+      <label className="field-label">其他／补充（选填）
+        <textarea className="condition-supplement" rows={1} value={text} maxLength={2000} disabled={busy}
           placeholder={located.card.placeholder || "没有合适的选项时再填写"}
           onChange={(event) => setText(event.target.value)} />
-      </label>}
+      </label>
     </>}
     <div className="panel-actions">
       <button type="button" className="text-button" disabled={busy} onClick={onCancel}>取消</button>
