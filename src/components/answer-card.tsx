@@ -11,6 +11,7 @@ import { useState } from "react";
 import { filterZhihuPosts, previewExcerpt, sourceSignals } from "@/lib/domain/sources";
 import type { Answer, ClarificationResponse, ClarificationRevision } from "@/lib/domain/types";
 import { ContextTags } from "./context-fields";
+import { BookmarkButton } from "./bookmarks";
 import { ConditionEditor } from "./condition-editor";
 
 function Citations({ ids, answer }: { ids: number[]; answer: Answer }) {
@@ -115,6 +116,7 @@ export function AnswerCard({
         </p>
         {posts.length ? (
           posts.map((source) => (
+            <div key={source.id}>
             <a
               id={`source-${answer.id}-${source.id}`}
               className="source-card"
@@ -146,6 +148,8 @@ export function AnswerCard({
                 打开知乎原帖 <ArrowUpRight size={15} />
               </span>
             </a>
+            <BookmarkButton post={{ url: source.url, title: source.title, author: source.author || "", excerpt: previewExcerpt(source) }} />
+            </div>
           ))
         ) : (
           <p className="empty-sources">

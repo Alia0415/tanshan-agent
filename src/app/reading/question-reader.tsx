@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { Question } from "@/lib/reading/discovery";
+import { BookmarkButton } from "@/components/bookmarks";
 import { ParticleField } from "./particle-field";
 
 type Stage = "entry" | "clarifying" | "summary" | "map";
@@ -361,7 +362,7 @@ export default function QuestionReader({ question }: { question: Question }) {
             <section className="answer-preview" aria-label="普通回答列表预览">
               <div className="answer-toolbar"><strong>这个问题下的回答</strong><span>摘要</span></div>
               {ordinaryLoading ? <p className="feed-notice" role="status">正在加载回答摘要…</p> : ordinaryError ? <p className="feed-notice" role="alert">{ordinaryError}</p> : ordinary.length === 0 ? <p className="feed-notice">暂未检索到这个问题的回答摘要，可前往知乎阅读。</p> :
-                ordinary.map(item => <article className="ordinary-answer" key={item.url}><strong>{item.author}</strong><p>{item.excerpt}</p><div><span>{item.votes} 赞同</span><a href={item.url} target="_blank" rel="noreferrer">阅读完整回答</a></div></article>)}
+                ordinary.map(item => <article className="ordinary-answer" key={item.url}><strong>{item.author}</strong><p>{item.excerpt}</p><div><span>{item.votes} 赞同</span><a href={item.url} target="_blank" rel="noreferrer">阅读完整回答</a><BookmarkButton post={{ url: item.url, title: question.title, author: item.author, excerpt: item.excerpt }} /></div></article>)}
               <a className="all-answers" href={question.url} target="_blank" rel="noreferrer">前往知乎查看全部回答</a>
             </section>
           )}
@@ -393,7 +394,7 @@ export default function QuestionReader({ question }: { question: Question }) {
             </div>
             <footer className="post-dialog-footer">
 
-              <a href={selectedPost.url} target="_blank" rel="noreferrer">打开知乎原文 ↗</a>
+              <a href={selectedPost.url} target="_blank" rel="noreferrer">打开知乎原文 ↗</a><BookmarkButton post={selectedPost} />
             </footer>
           </article>
         </div>

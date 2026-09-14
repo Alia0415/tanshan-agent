@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { MobileTabbar } from "@/components/mobile-tabbar";
+import { BookmarkProvider } from "@/components/bookmarks";
 import { ProductNav } from "@/components/product-nav";
 
 export const metadata: Metadata = {
@@ -14,7 +15,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN">
-      <body><ProductNav />{children}<MobileTabbar /></body>
+      <body><BookmarkProvider><ProductNav />{children}<MobileTabbar /></BookmarkProvider></body>
     </html>
   );
 }
