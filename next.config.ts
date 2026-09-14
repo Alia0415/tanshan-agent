@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const config: NextConfig = {
+  devIndicators: false,
   output: process.env.WENSHAN_STANDALONE === "1" ? "standalone" : undefined,
   poweredByHeader: false,
   async headers() {
