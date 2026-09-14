@@ -1,14 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import Image from "next/image";
+import Link from "next/link";
 import {
   ArrowRight,
   ArrowUp,
   BookOpen,
+  Camera,
   Check,
   BriefcaseBusiness,
+  Compass,
+  GraduationCap,
   Leaf,
   LoaderCircle,
   MessageCircle,
@@ -27,27 +30,60 @@ import { ContextFields, ContextTags } from "./context-fields";
 import { AnswerCard } from "./answer-card";
 import { WaveProgressFloat } from "./wave-progress";
 import { SearchProgress } from "./search-progress";
+import homeStyles from "./workspace-home.module.css";
 
 type Result = { session: Session; auto_answer?: boolean };
 const STORAGE_KEY = "wenshan.agent-session-v2";
+const productEntries = [
+  {
+    href: "/reading",
+    icon: BookOpen,
+    title: "阅读助手",
+    eyebrow: "READING MAP",
+    description: "从知乎讨论里整理线索，生成可继续探索的阅读地图。",
+    image: "/entry-previews/reading-preview.png",
+    imageHeight: 267,
+  },
+  {
+    href: "/roundtable",
+    icon: MessagesSquare,
+    title: "观点圆桌",
+    eyebrow: "AGENT ROUNDTABLE",
+    description: "让不同立场的 Agent 开诚交锋，看见问题的多个侧面。",
+    image: "/entry-previews/roundtable-preview.png",
+    imageHeight: 251,
+  },
+];
 const examples = [
   {
     icon: BriefcaseBusiness,
-    category: "工作与选择",
+    category: "职业选择",
     text: "要不要从大公司去创业公司？",
     hint: "把选择放回自己的处境",
   },
   {
-    icon: BookOpen,
-    category: "消费与日常",
+    icon: Camera,
+    category: "消费决策",
     text: "想买一台相机，应该怎么选？",
-    hint: "先说用途，再谈推荐",
+    hint: "先确认用途，再比较参数",
   },
   {
     icon: Leaf,
-    category: "生活与关系",
+    category: "生活关系",
     text: "和室友作息不同，怎么办？",
-    hint: "找到适合你们的相处办法",
+    hint: "听见经验，也梳理边界",
+  },
+  {
+    icon: GraduationCap,
+    category: "学业规划",
+    text: "我真的适合读博吗？",
+    hint: "兴趣、机会成本与长期目标",
+  },
+  {
+    icon: Compass,
+    category: "成长路径",
+    text: "想转行进入 AI，现在开始晚吗？",
+    hint: "从现实条件出发找到下一步",
   },
 ];
 const emptyContext = (): Context => ({ priorities: [] });
@@ -468,9 +504,12 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
       reason,
     });
   };
+  const isLanding = !session && !historyOpen;
 
   return (
-    <div className={`app-shell agent-workspace${showClarificationProgress ? " has-clarification-progress" : ""}`}>
+    <div
+      className={`app-shell agent-workspace${isLanding ? ` ${homeStyles.landingMode}` : ""}${showClarificationProgress ? " has-clarification-progress" : ""}`}
+    >
       <aside className="sidebar">
         <Link className="brand" href="/" aria-label="问山首页">
           <span className="brand-icon">
@@ -542,8 +581,10 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
             className="side-user"
             onClick={() => setAbout(true)}
           >
-            <span className="side-avatar">访</span>
             <span className="side-user-name">访客</span>
+            <span className="side-mode">
+              {session?.provider === "live" ? "联网问答" : "体验模式"}
+            </span>
             <MoreHorizontal size={16} aria-hidden="true" />
           </button>
           <Link className="side-user" href="/me">
@@ -582,10 +623,19 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
             >
               <Plus size={20} />
             </button>
-            <span className="avatar">访</span>
           </div>
         </header>
-        <main id="main-content" className={session ? "conversation" : "home"}>
+        <div className="agent-main-scroll">
+          <main
+            id="main-content"
+            className={
+              session
+                ? "conversation"
+                : isLanding
+                  ? `home ${homeStyles.homeLanding}`
+                  : "home"
+            }
+          >
           {notice && (
             <div className="notice" role="alert">
               <span>{notice}</span>
@@ -617,99 +667,78 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
               ))}</div>}
             </section>
           ) : !session ? (
-            <section className="ds-entry">
-              <div className="ds-greeting">
-                <span className="ds-logo" aria-hidden="true">
-                  <Mountain size={30} strokeWidth={1.5} />
-                </span>
-                <h1>你好，这里是问山</h1>
-                <p>多问一句，答案更近一步</p>
+            <section
+              className={homeStyles.landing}
+              aria-labelledby="landing-title"
+            >
+              <span className={homeStyles.orbitOne} aria-hidden="true" />
+              <span className={homeStyles.orbitTwo} aria-hidden="true" />
+
+              <div className={homeStyles.hero}>
+                <p className={homeStyles.kicker}>
+                  <Sparkles size={14} aria-hidden="true" />
+                  知乎讨论 · 为你的处境重新组织
+                </p>
+                <h1 id="landing-title">
+                  你好，<em>这里是问山。</em>
+                </h1>
+                <p className={homeStyles.lead}>多问一句，答案更近一步。</p>
+                <p className={homeStyles.supportingCopy}>
+                  从一个真实问题开始，让 Agent 先理解你的处境，再一起靠近答案。
+                </p>
               </div>
-              <nav className="ds-entries" aria-label="其他入口">
-                <div className="ds-entry-wrap">
-                  <span className="ds-pop-side" aria-hidden="true">
-                    <Image
-                      src="/entry-previews/reading-preview.png"
-                      alt=""
-                      width={448}
-                      height={267}
-                    />
-                  </span>
-                  <span className="ds-pop" aria-hidden="true">
-                    <span className="ds-pop-art">
-                      <svg viewBox="0 0 76 56" fill="none">
-                        <path
-                          d="M38 13C32 7.5 21.5 6.5 13 9.5V39c8.5-3 19-2 25 3"
-                          fill="#edf5ff"
-                          stroke="#056de8"
-                          strokeWidth="1.8"
-                          strokeLinejoin="round"
+
+              <nav className={homeStyles.entries} aria-label="其他入口">
+                {productEntries.map((entry) => {
+                  const Icon = entry.icon;
+                  const descriptionId = `${entry.href.slice(1)}-preview-description`;
+
+                  return (
+                    <div className={homeStyles.entryWrap} key={entry.href}>
+                      <span className={homeStyles.entryShot} aria-hidden="true">
+                        <Image
+                          className={homeStyles.entryShotImage}
+                          src={entry.image}
+                          alt=""
+                          width={448}
+                          height={entry.imageHeight}
+                          sizes="224px"
                         />
-                        <path
-                          d="M38 13c6-5.5 16.5-6.5 25-3.5V39c-8.5-3-19-2-25 3"
-                          fill="#fff"
-                          stroke="#056de8"
-                          strokeWidth="1.8"
-                          strokeLinejoin="round"
-                        />
-                        <path
-                          d="M18 18h12M18 24h12M18 30h8M46 18h12M46 24h12M46 30h8"
-                          stroke="#9ec7fa"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                        />
-                        <path
-                          d="M38 12v30"
-                          stroke="#056de8"
-                          strokeWidth="1.8"
-                        />
-                      </svg>
-                    </span>
-                    <strong>阅读助手</strong>
-                    <small>搜索知乎讨论，先把问题读透</small>
-                  </span>
-                  <Link href="/reading" className="ds-entry-link">
-                    <BookOpen size={17} aria-hidden="true" />
-                    阅读助手
-                  </Link>
-                </div>
-                <div className="ds-entry-wrap">
-                  <span className="ds-pop-side" aria-hidden="true">
-                    <Image
-                      src="/entry-previews/roundtable-preview.png"
-                      alt=""
-                      width={448}
-                      height={251}
-                    />
-                  </span>
-                  <span className="ds-pop" aria-hidden="true">
-                    <span className="ds-pop-art">
-                      <svg viewBox="0 0 76 56" fill="none">
-                        <path
-                          d="M19 15 30 25M57 15 46 25M19 45 30 36M57 45 46 36"
-                          stroke="#dbeaff"
-                          strokeWidth="1.6"
-                        />
-                        <circle cx="38" cy="30" r="9.5" fill="#edf5ff" stroke="#056de8" strokeWidth="1.6" />
-                        <circle cx="14" cy="12" r="6.5" fill="#056de8" />
-                        <circle cx="62" cy="12" r="6.5" fill="#f59e0b" />
-                        <circle cx="10" cy="42" r="6.5" fill="#10b981" />
-                        <circle cx="66" cy="42" r="6.5" fill="#8b5cf6" />
-                        <rect x="26" y="2" width="14" height="8" rx="4" fill="#056de8" opacity="0.85" />
-                        <rect x="42" y="46" width="16" height="8" rx="4" fill="#10b981" opacity="0.85" />
-                      </svg>
-                    </span>
-                    <strong>观点圆桌</strong>
-                    <small>多立场 Agent 同场交锋</small>
-                  </span>
-                  <Link href="/roundtable" className="ds-entry-link">
-                    <MessagesSquare size={17} aria-hidden="true" />
-                    观点圆桌
-                  </Link>
-                </div>
+                      </span>
+                      <span
+                        className={homeStyles.entryBubble}
+                        aria-hidden="true"
+                      >
+                        <span className={homeStyles.entryBubbleIcon}>
+                          <Icon size={25} strokeWidth={1.7} />
+                        </span>
+                        <span className={homeStyles.entryBubbleEyebrow}>
+                          {entry.eyebrow}
+                        </span>
+                        <strong>{entry.title}</strong>
+                        <small>{entry.description}</small>
+                      </span>
+                      <Link
+                        href={entry.href}
+                        className={homeStyles.entryLink}
+                        aria-describedby={descriptionId}
+                      >
+                        <span>
+                          <Icon size={17} aria-hidden="true" />
+                          {entry.title}
+                        </span>
+                        <ArrowRight size={15} aria-hidden="true" />
+                      </Link>
+                      <span className="sr-only" id={descriptionId}>
+                        {entry.description}
+                      </span>
+                    </div>
+                  );
+                })}
               </nav>
+
               <form
-                className={`ds-composer ${question.length > 2000 ? "invalid" : ""}`}
+                className={`${homeStyles.composer} ${question.length > 2000 ? homeStyles.invalid : ""}`}
                 onSubmit={(event) => {
                   event.preventDefault();
                   startQuestion();
@@ -735,19 +764,26 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
                     }
                   }}
                 />
-                <div className="ds-composer-bar">
-                  <span className="ds-mode" title="信息不足时问山会先追问，再回答">
+                <div className={homeStyles.composerBar}>
+                  <span
+                    className={homeStyles.mode}
+                    title="信息不足时问山会先追问，再回答"
+                  >
                     <Sparkles size={13} aria-hidden="true" />
                     智能追问
                   </span>
                   {question.length > 2000 && (
-                    <span className="ds-error">最多 2,000 字，请缩短</span>
+                    <span className={homeStyles.error}>
+                      最多 2,000 字，请缩短
+                    </span>
                   )}
                   {question.length > 1800 && question.length <= 2000 && (
-                    <span className="ds-count">{2000 - question.length}</span>
+                    <span className={homeStyles.count}>
+                      {2000 - question.length}
+                    </span>
                   )}
                   <button
-                    className="ds-send"
+                    className={homeStyles.send}
                     type="submit"
                     aria-label="发送问题"
                     disabled={
@@ -765,27 +801,60 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
                   </button>
                 </div>
               </form>
-              <div className="ds-suggest" aria-label="推荐问题">
-                {examples.map((example) => (
-                  <button
-                    className="ds-chip"
-                    type="button"
-                    key={example.category}
-                    disabled={Boolean(busy) || restoring}
-                    onClick={() => {
-                      setQuestion(example.text);
-                      questionInput.current?.focus();
-                    }}
-                  >
-                    {example.text}
-                  </button>
-                ))}
-              </div>
+
               {busy && (
-                <p className="loading-caption" role="status">
+                <p className={homeStyles.loading} role="status">
+                  <LoaderCircle className="spin" size={15} />
                   {busy}…
                 </p>
               )}
+
+              <section
+                className={homeStyles.questionShelf}
+                aria-labelledby="question-shelf-title"
+              >
+                <div className={homeStyles.shelfHeading}>
+                  <div>
+                    <span>QUESTION POSTS</span>
+                    <h2 id="question-shelf-title">从五个问题开始探索</h2>
+                  </div>
+                  <p>点击任意卡片，将问题放入上方对话框</p>
+                </div>
+                <div className={homeStyles.questionCards}>
+                  {examples.map((example, index) => {
+                    const Icon = example.icon;
+                    return (
+                      <button
+                        className={homeStyles.questionCard}
+                        type="button"
+                        key={example.category}
+                        disabled={Boolean(busy) || restoring}
+                        aria-label={`使用问题：${example.text}`}
+                        onClick={() => {
+                          setQuestion(example.text);
+                          questionInput.current?.focus();
+                        }}
+                      >
+                        <span className={homeStyles.cardTop}>
+                          <span className={homeStyles.cardCategory}>
+                            <Icon size={16} aria-hidden="true" />
+                            {example.category}
+                          </span>
+                          <span className={homeStyles.cardIndex}>
+                            {String(index + 1).padStart(2, "0")}
+                          </span>
+                        </span>
+                        <strong>{example.text}</strong>
+                        <small>{example.hint}</small>
+                        <span className={homeStyles.cardAction}>
+                          带给问山
+                          <ArrowRight size={15} aria-hidden="true" />
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
             </section>
           ) : (
             <>
@@ -1086,11 +1155,12 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
               )}
             </>
           )}
-        </main>
-        <footer className="page-footer">
-          <span>多问一句，答案更近一步。</span>
-          <span>匿名会话保留 24 小时</span>
-        </footer>
+          </main>
+          <footer className="page-footer">
+            <span>多问一句，答案更近一步。</span>
+            <span>匿名会话保留 24 小时</span>
+          </footer>
+        </div>
       </div>
       {showClarificationProgress && (
         <WaveProgressFloat
