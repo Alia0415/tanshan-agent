@@ -87,8 +87,8 @@ export function BookmarkLibraryButton() {
   useEffect(() => {
     const open = () => dialog.current?.showModal();
     if (new URLSearchParams(window.location.search).get("bookmarks") === "1") open();
-    window.addEventListener("wenshan:open-bookmarks", open);
-    return () => window.removeEventListener("wenshan:open-bookmarks", open);
+    window.addEventListener("tanshan:open-bookmarks", open);
+    return () => window.removeEventListener("tanshan:open-bookmarks", open);
   }, [mounted]);
   return <>
     <button type="button" className="side-user" aria-haspopup="dialog" onClick={() => dialog.current?.showModal()}>

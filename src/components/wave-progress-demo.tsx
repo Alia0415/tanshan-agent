@@ -67,12 +67,12 @@ export function WaveProgressDemo() {
       <div className={styles.ambientOrbTwo} aria-hidden="true" />
 
       <header className={styles.header}>
-        <Link className={styles.brand} href="/" aria-label="返回问山首页">
+        <Link className={styles.brand} href="/" aria-label="返回探山首页">
           <span className={styles.brandMark}>
             <Mountain size={20} strokeWidth={1.8} />
           </span>
           <span>
-            问山 <small>WENSHAN</small>
+            探山 <small>TANSHAN</small>
           </span>
         </Link>
         <span className={styles.prototypeBadge}>
@@ -93,7 +93,7 @@ export function WaveProgressDemo() {
             <span>离答案更近一点。</span>
           </h1>
           <p className={styles.intro}>
-            水位代表问山对你阅读意图的理解程度。每输出一个问题，水波就会上升一格；信息足够时，整颗圆会被逐渐填满。
+            水位代表探山对你阅读意图的理解程度。每输出一个问题，水波就会上升一格；信息足够时，整颗圆会被逐渐填满。
           </p>
 
           <div className={styles.questionCard} aria-live="polite">

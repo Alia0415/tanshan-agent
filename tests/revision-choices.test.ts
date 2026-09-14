@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import { choicesForTag, revisionChoices } from "../src/lib/server/revision-choices";
 import { createSession, clarify, updateContext, claimAnswer, runAnswer } from "../src/lib/server/sessions";
 import { getSession, saveSession } from "../src/lib/server/store";
-process.env.WENSHAN_DB_PATH = join(mkdtempSync(join(tmpdir(), "wenshan-choices-")), "sessions.sqlite");
+process.env.WENSHAN_DB_PATH = join(mkdtempSync(join(tmpdir(), "tanshan-choices-")), "sessions.sqlite");
 process.env.WENSHAN_PROVIDER = "live";
 process.env.WENSHAN_SEARCH_MODE = "basic";
 process.env.DEEPSEEK_API_KEY = "test-only";

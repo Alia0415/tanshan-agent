@@ -560,12 +560,12 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
         {sidebarCollapsed ? <PanelLeftOpen size={19} aria-hidden="true" /> : <PanelLeftClose size={19} aria-hidden="true" />}
       </button>
       <aside id="workspace-sidebar" className="sidebar" inert={sidebarCollapsed}>
-        <Link className="brand" href="/" aria-label="问山首页">
+        <Link className="brand" href="/" aria-label="探山首页">
           <span className="brand-icon">
             <Mountain size={21} strokeWidth={1.7} />
           </span>
           <span>
-            问山<small>WENSHAN</small>
+            探山<small>TANSHAN</small>
           </span>
         </Link>
         <button
@@ -656,13 +656,13 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
           <div className="breadcrumb">
             <span className="mobile-brand">
               <Mountain size={21} />
-              问山
+              探山
             </span>
-            <Link className="header-brand" href="/">问山</Link>
+            <Link className="header-brand" href="/">探山</Link>
             <nav className="header-nav" aria-label="主导航">
               <button type="button" className={historyOpen ? "" : "nav-current"} onClick={() => { setHistoryOpen(false); document.getElementById("main-content")?.scrollIntoView({ behavior: "smooth" }); }}>{session ? "当前提问" : "首页"}</button>
               <button type="button" className={historyOpen ? "nav-current" : ""} onClick={openHistory} disabled={Boolean(busy) || restoring}>历史问题</button>
-              <button type="button" onClick={() => setAbout(true)}>关于问山</button>
+              <button type="button" onClick={() => setAbout(true)}>关于探山</button>
             </nav>
           </div>
           <div className="topbar-right">
@@ -735,7 +735,7 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
 
               <div className={homeStyles.hero}>
                 <h1 id="landing-title">
-                  你好，<em>这里是问山</em>
+                  你好，<em>这里是探山</em>
                 </h1>
               </div>
 
@@ -808,7 +808,7 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
                 <div className={homeStyles.composerBar}>
                   <span
                     className={homeStyles.mode}
-                    title="信息不足时问山会先追问，再回答"
+                    title="信息不足时探山会先追问，再回答"
                   >
                     <Sparkles size={13} aria-hidden="true" />
                     智能追问
@@ -923,7 +923,7 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
                     <span className="assistant-mark">
                       <Mountain size={21} />
                     </span>
-                    <span className="eyebrow">问山想再了解一点</span>
+                    <span className="eyebrow">探山想再了解一点</span>
                     <span className="round-count">
                       第 {session.clarification_count + 1} / {MAX_CLARIFICATION_ROUNDS} 轮
                     </span>
@@ -1175,7 +1175,7 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
               autoFocus
               className="icon-button dialog-close"
               type="button"
-              aria-label="关闭关于问山"
+              aria-label="关闭关于探山"
               onClick={() => setAbout(false)}
             >
               <X size={20} />
@@ -1185,7 +1185,7 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
             </span>
             <h2 id="about-title">多问一句，答案更近一步。</h2>
             <p>
-              问山根据你的具体问题和补充，判断还需要了解什么。最多追问 {MAX_CLARIFICATION_ROUNDS} 轮，信息足够就开始回答，也可以随时跳过。
+              探山根据你的具体问题和补充，判断还需要了解什么。最多追问 {MAX_CLARIFICATION_ROUNDS} 轮，信息足够就开始回答，也可以随时跳过。
             </p>
             <p>
               连接真实资料后，每次回答会展示可检查的来源。演示模式仅展示交互与一般性分析框架。

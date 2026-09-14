@@ -254,13 +254,13 @@ export async function POST(request: Request) {
     if (requestCache.size >= 100) requestCache.delete(requestCache.keys().next().value!);
     const cached = requestCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
-      return Response.json(await cached.promise, { headers: { "X-Wenshan-Cache": "HIT" } });
+      return Response.json(await cached.promise, { headers: { "X-Tanshan-Cache": "HIT" } });
     }
 
     const promise = buildReadingMap(question, intent);
     requestCache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, promise });
     try {
-      return Response.json(await promise, { headers: { "X-Wenshan-Cache": "MISS" } });
+      return Response.json(await promise, { headers: { "X-Tanshan-Cache": "MISS" } });
     } catch (error) {
       requestCache.delete(cacheKey);
       throw error;

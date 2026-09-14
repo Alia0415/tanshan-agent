@@ -12,7 +12,7 @@ import type { Session } from "../src/lib/domain/types";
 import { buildQueries } from "../src/lib/domain/clarification";
 import { receiveAgentMessage } from "../src/lib/agent/bridge";
 
-process.env.WENSHAN_DB_PATH = join(mkdtempSync(join(tmpdir(), "wenshan-planner-")), "sessions.sqlite");
+process.env.WENSHAN_DB_PATH = join(mkdtempSync(join(tmpdir(), "tanshan-planner-")), "sessions.sqlite");
 process.env.WENSHAN_PROVIDER = "live";
 process.env.WENSHAN_CLARIFICATION_MODE = "deepseek";
 process.env.WENSHAN_SEARCH_MODE = "basic";

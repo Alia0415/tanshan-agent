@@ -56,7 +56,7 @@ export function ProductNav() {
     >
       {!isAgentRoute && (
         <Link className="product-brand" href="/">
-          问山
+          探山
         </Link>
       )}
       {products.map((item) => (

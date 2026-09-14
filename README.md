@@ -1,8 +1,8 @@
-# 问山 Agent
+# 探山 Agent
 
 **从一个问题出发，找到适合自己处境的知乎经验与观点。**
 
-问山把问题澄清、知乎检索、回答阅读和多立场讨论连接起来。你可以直接提问，也可以从感兴趣的知乎问题出发，深入阅读或开启一场观点圆桌。覆盖工作、消费、生活、人际关系、技术与学习，不限定提问领域。
+探山把问题澄清、知乎检索、回答阅读和多立场讨论连接起来。你可以直接提问，也可以从感兴趣的知乎问题出发，深入阅读或开启一场观点圆桌。覆盖工作、消费、生活、人际关系、技术与学习，不限定提问领域。
 
 [快速开始](#快速开始) · [功能入口](#功能入口) · [配置说明](#配置说明) · [开发与验证](#开发与验证) · [项目文档](#项目文档)
 
@@ -12,7 +12,7 @@
 
 | 功能 | 可以做什么 | 本地路径 | 服务依赖 |
 | --- | --- | --- | --- |
-| 问山问答 | 自然提问、补充处境、查看匹配帖子与可展开的辅助总结 | `/` | 无密钥可体验规则演示；真实资料需要知乎凭证 |
+| 探山问答 | 自然提问、补充处境、查看匹配帖子与可展开的辅助总结 | `/` | 无密钥可体验规则演示；真实资料需要知乎凭证 |
 | 知乎阅读 | 发现问题、阅读回答、使用阅读助手和阅读地图 | `/reading` | 知乎服务；配置 DeepSeek 后用于阅读追问、分类与筛选 |
 | 观点圆桌 | 围绕真实帖子展开多立场讨论，支持访客发言 | `/roundtable` | 知乎检索与直答；实验能力 |
 | 我的知乎 | OAuth 登录后查看授权范围内的创作、关注与收藏 | `/me` | OAuth 应用配置与用户授权 |
@@ -41,8 +41,8 @@
 ### 1. 获取代码并安装依赖
 
 ```sh
-git clone https://github.com/Alia0415/wenshan-agent.git
-cd wenshan-agent
+git clone https://github.com/Alia0415/tanshan-agent.git
+cd tanshan-agent
 npm ci
 ```
 
@@ -158,8 +158,8 @@ prototype/              历史原型，非主应用启动入口
 当前使用**单个 Node.js 实例与持久磁盘**。多副本或临时磁盘 Serverless 部署需要共享存储和持久任务队列。阅读热榜记录存放在 `.data/questions.json`，部署时也应保留 `.data`。
 
 ```sh
-docker build -t wenshan-agent .
-docker run -d --name wenshan -p 3000:3000 --env-file .env.local -v wenshan-data:/app/.data wenshan-agent
+docker build -t tanshan-agent .
+docker run -d --name tanshan -p 3000:3000 --env-file .env.local -v wenshan-data:/app/.data tanshan-agent
 ```
 
 生产 Cookie 使用 Secure，应通过 HTTPS 反向代理访问。运行环境需能访问知乎及所配置的模型 API，否则页面可打开，但无法读取真实内容。

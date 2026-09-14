@@ -83,7 +83,7 @@ a:focus-visible {
 
 .zhihu-word { color: var(--blue); font-size: 19px; font-weight: 700; letter-spacing: -0.04em; }
 .brand-divider { width: 1px; height: 18px; background: var(--line-strong); }
-.wenshan-word { font-size: 16px; font-weight: 650; }
+.tanshan-word { font-size: 16px; font-weight: 650; }
 
 .search-shell {
   height: 38px;

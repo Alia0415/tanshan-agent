@@ -14,11 +14,11 @@ const SEEN_KEY = "wenshan.onboarding-seen";
 
 const STEPS: Step[] = [
   {
-    eyebrow: "为什么是问山",
+    eyebrow: "为什么是探山",
     title: "回答多而杂，答案不好找？",
     lines: [
       "知乎话题下的回复常常多而杂，难以快速找到自己想要的答案。",
-      "问山会追问你的背景，帮你找答案、理思路；",
+      "探山会追问你的背景，帮你找答案、理思路；",
       "也把回答之间的争论拆分出来，用多个 Agent 代表不同观点派系，帮你找到争论点，打破信息茧房。",
     ],
     art: "welcome",
@@ -27,7 +27,7 @@ const STEPS: Step[] = [
     eyebrow: "第一站 · Agent 问答",
     title: "几轮追问，把模糊的问题变具体",
     lines: [
-      "进入问山，第一眼看到的就是它。",
+      "进入探山，第一眼看到的就是它。",
       "通过几轮追问补充你的背景，把原本模糊的问题变成具体的问题，",
       "从而找到更适合你情况的答案。",
     ],
@@ -171,7 +171,7 @@ export function Onboarding() {
   const last = index === STEPS.length - 1;
 
   return (
-    <div className="ob-overlay" role="dialog" aria-modal="true" aria-label="问山新手指引">
+    <div className="ob-overlay" role="dialog" aria-modal="true" aria-label="探山新手指引">
       <div className="ob-card">
         <button type="button" className="ob-skip" onClick={finish} aria-label="跳过引导">
           跳过
@@ -180,7 +180,7 @@ export function Onboarding() {
 
         <div className="ob-brand" aria-hidden="true">
           <Mountain size={16} strokeWidth={1.8} />
-          问山 · WENSHAN
+          探山 · TANSHAN
         </div>
 
         <div className="ob-step" key={index}>
@@ -210,7 +210,7 @@ export function Onboarding() {
             ) : (
               <span className="ob-hint">
                 <Sparkles size={13} aria-hidden="true" />
-                约 30 秒了解问山
+                约 30 秒了解探山
               </span>
             )}
             {last ? (

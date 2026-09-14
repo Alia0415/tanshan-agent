@@ -14,7 +14,7 @@ export type WaveProgressFloatProps = {
 export function WaveProgressFloat({
   value,
   size = 104,
-  label = "问山澄清进度",
+  label = "探山澄清进度",
   position = "bottom-right",
   className = "",
 }: WaveProgressFloatProps) {
