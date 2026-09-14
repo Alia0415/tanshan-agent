@@ -14,7 +14,7 @@ export async function revisionChoices(id: string, token: string, version: number
     throw new AppError("INVALID_SELECTION", "找不到可修改的追问。");
   const supplement = "关于「" + turn.question + "」：" + turn.answer;
   if (!session.free_text_context.includes(supplement))
-    throw new AppError("INVALID_SELECTION", "这条追问缺少修改记录，请使用修改条件再问。");
+    throw new AppError("INVALID_SELECTION", "这条历史条件缺少修改记录，暂时无法编辑。请新建提问并填写最新需求。");
   if (turn.card?.options?.length) return turn.card;
   const key = id + ":" + version + ":" + index;
   if (pending.has(key)) return pending.get(key)!;
@@ -63,7 +63,7 @@ export async function choicesForTag(id: string, token: string, version: number, 
       let data: unknown;
       try { data = JSON.parse(content); } catch { throw new AppError("CLARIFICATION_INVALID", "暂未定位到对应选项，请重试。", 502); }
       const result = z.object({ history_index: z.number().int().nonnegative().nullable() }).strict().safeParse(data);
-      if (!result.success || result.data.history_index === null) throw new AppError("INVALID_SELECTION", "这项标签没有对应的追问回答，可通过修改条件再问调整。");
+      if (!result.success || result.data.history_index === null) throw new AppError("INVALID_SELECTION", "这项条件没有对应的追问回答，暂时无法单独修改。请新建提问并填写最新需求。");
       index = result.data.history_index;
     }
   }

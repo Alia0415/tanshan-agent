@@ -480,7 +480,7 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
       const answer = result.session.answers.find(
         (item) => item.context_version === result.session.context_version,
       ) ?? result.session.answers.at(-1);
-      setHistoryResult(answer ? { answerId: answer.id } : null);
+      setHistoryResult(result.session.stage === "completed" && answer ? { answerId: answer.id } : null);
       remember(id);
       setFreeText("");
       setClarificationAnswers([]);
