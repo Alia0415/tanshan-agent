@@ -85,7 +85,7 @@ export default function MePage() {
           <Mountain size={18} aria-hidden="true" />
           问山
         </Link>
-        <h1>我的知乎</h1>
+        <h1>我的知乎</h1><Link href="/bookmarks">我的问山收藏夹 →</Link>
         <p>
           用知乎账号登录后，可以在这里查看你授权范围内的创作、关注与收藏。
           凭证只保存在服务端，24 小时内有效。
