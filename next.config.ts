@@ -21,7 +21,10 @@ const config: NextConfig = {
         has: [{ type: "query" as const, key }],
         destination: "/api/oauth/callback",
       })),
-      afterFiles: [],
+      afterFiles: [
+        // Static easter-egg page built with Vite and shipped in public/lumora.
+        { source: "/lumora", destination: "/lumora/index.html" },
+      ],
       fallback: [],
     };
   },

@@ -4,5 +4,6 @@ import nextTs from "eslint-config-next/typescript";
 export default defineConfig([
   ...nextVitals,
   ...nextTs,
-  globalIgnores([".next/**", "next-env.d.ts", "prototype/**"]),
+  // public/lumora holds a prebuilt Vite bundle (easter-egg page), not source.
+  globalIgnores([".next/**", "next-env.d.ts", "prototype/**", "public/lumora/**"]),
 ]);

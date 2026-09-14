@@ -94,6 +94,13 @@ const examples = [
   },
 ];
 const emptyContext = (): Context => ({ priorities: [] });
+// Easter egg: typing this code in the question box opens the standalone
+// Lumora page shipped in public/lumora (its 返回 button comes back here).
+const EASTER_EGG = { code: "114514", href: "/lumora" };
+const isEasterEgg = (value: string) => value.trim() === EASTER_EGG.code;
+// The target is a static page outside the app router, so it needs a full navigation.
+const openEasterEgg = () =>
+  window.location.assign(new URL(EASTER_EGG.href, window.location.origin));
 
 class ApiError extends Error {
   constructor(
@@ -353,6 +360,10 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
   }
 
   function startQuestion() {
+    if (isEasterEgg(question)) {
+      openEasterEgg();
+      return;
+    }
     if (!question.trim() || question.trim().length > 2000) return;
     void run("正在理解你的问题", async (ticket) =>
       accept(
@@ -745,7 +756,11 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
                   id="question"
                   ref={questionInput}
                   value={question}
-                  onChange={(event) => setQuestion(event.target.value)}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setQuestion(value);
+                    if (isEasterEgg(value)) openEasterEgg();
+                  }}
                   placeholder="想问什么？例如：要不要从大公司去创业公司？"
                   disabled={Boolean(busy) || restoring}
                   onKeyDown={(event) => {
