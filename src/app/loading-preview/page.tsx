@@ -23,7 +23,6 @@ export default async function LoadingPreview({ searchParams }: { searchParams: P
         <div className="tags"><span className="tag">比较与选择</span></div>
         <SearchProgress searching={searching} disconnected={disconnected} />
         {disconnected && <Link className="primary" href="/loading-preview">重新连接</Link>}
-        <Link className="text-button" href="/">修改条件</Link>
       </section>
       <p style={{ textAlign: "center", color: "#64748b", fontSize: 12, marginTop: 20 }}>加载效果预览 · 不会发起检索请求</p>
     </main>

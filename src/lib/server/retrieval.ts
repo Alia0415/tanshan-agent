@@ -45,7 +45,7 @@ export async function retrieve(
   provider: Pick<KnowledgeProvider, "search">,
   isCurrent: () => boolean = () => true,
   intelligence?: SearchIntelligence,
-): Promise<{ sources: Source[]; queries: string[]; warnings: string[]; info: SearchInfo }> {
+): Promise<{ sources: Source[]; queries: string[]; warnings: string[]; info: SearchInfo; conditionTags: string[]; conditionSources: { label: string; history_index: number }[] }> {
   const mode = process.env.WENSHAN_SEARCH_MODE || "auto";
   if (!["auto", "basic", "deepseek"].includes(mode))
     throw new AppError("CONFIGURATION", "搜索优化模式配置无效。", 503);
@@ -133,6 +133,8 @@ export async function retrieve(
   const sources = deduplicate(selected.slice(0, DISPLAY_LIMIT));
   return {
     sources, queries, warnings,
+    conditionTags: [...new Set(plan.requirements)],
+    conditionSources: (plan.requirement_sources || []).filter((source) => plan.requirements.includes(source.label) && session.clarification_history?.[source.history_index]),
     info: { strategy, candidate_count: candidates.length, selected_count: sources.length, reviewed, expanded },
   };
 }

@@ -4,14 +4,14 @@ import {
   ArrowUpRight,
   BookOpen,
   Check,
-  PencilLine,
   ThumbsDown,
   ThumbsUp,
 } from "lucide-react";
 import { useState } from "react";
 import { filterZhihuPosts, previewExcerpt, sourceSignals } from "@/lib/domain/sources";
-import type { Answer } from "@/lib/domain/types";
+import type { Answer, ClarificationResponse, ClarificationRevision } from "@/lib/domain/types";
 import { ContextTags } from "./context-fields";
+import { ConditionEditor } from "./condition-editor";
 
 function Citations({ ids, answer }: { ids: number[]; answer: Answer }) {
   return (
@@ -34,18 +34,25 @@ function Citations({ ids, answer }: { ids: number[]; answer: Answer }) {
 export function AnswerCard({
   answer,
   stale,
-  onEdit,
   onFeedback,
+  onEditCondition,
+  onLoadChoices,
+  clarificationHistory = [],
+  busy = false,
 }: {
   answer: Answer;
   stale: boolean;
-  onEdit: () => void;
+  onEditCondition?: (revision: ClarificationRevision) => void;
+  clarificationHistory?: ClarificationResponse[];
+  onLoadChoices?: (label: string, answerId: string) => Promise<{ history_index: number; card: import("@/lib/domain/types").ClarificationCard }>;
+  busy?: boolean;
   onFeedback: (
     id: string,
     type: "helpful" | "irrelevant",
     reason?: string,
   ) => Promise<void>;
 }) {
+  const [editingTag, setEditingTag] = useState<string | null>(null);
   const posts = filterZhihuPosts(answer.sources);
   const legacyOutsideSources = posts.length !== answer.sources.length;
   const [feedback, setFeedback] = useState<"helpful" | "irrelevant" | null>(
@@ -86,7 +93,15 @@ export function AnswerCard({
                   : `${posts.length} 篇知乎帖子`}
         </span>
       </div>
-      <ContextTags context={answer.context} />
+      <ContextTags context={answer.context} labels={answer.condition_tags}
+        disabled={busy}
+        onSelect={!stale && onEditCondition ? (label) => {
+          setEditingTag(label);
+        } : undefined} />
+      {!stale && editingTag !== null && onEditCondition && (
+        <ConditionEditor key={editingTag} label={editingTag} answerId={answer.id} sources={answer.condition_sources} history={clarificationHistory}
+          busy={busy} onLoadChoices={onLoadChoices} onSave={onEditCondition} onCancel={() => setEditingTag(null)} />
+      )}
       <section className="sources post-results" aria-label="知乎帖子列表">
         <h2 className="posts-heading">
           为你找到的知乎帖子 <span>{posts.length}</span>
@@ -193,10 +208,6 @@ export function AnswerCard({
 
       {!stale && (
         <div className="answer-actions">
-          <button type="button" className="text-button" onClick={onEdit}>
-            <PencilLine size={16} />
-            修改条件再问
-          </button>
           <div className="feedback-actions">
             {feedback ? (
               <span className="feedback-saved">

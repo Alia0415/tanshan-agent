@@ -915,7 +915,8 @@ summary {
   gap: 7px;
   flex-wrap: wrap;
 }
-.tags > span {
+.tags > span,
+.tags > .editable-context-tag {
   font-size: 10px;
   background: #f0f6ff;
   color: #64748b;
@@ -1276,7 +1277,7 @@ summary {
   border-top: 1px solid #f0f6ff;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 10px;
   flex-wrap: wrap;
 }
@@ -1903,7 +1904,8 @@ summary {
   .panel h2 {
     font-size: 18px;
   }
-  .tags > span {
+  .tags > span,
+.tags > .editable-context-tag {
     font-size: 9px;
   }
 }
@@ -2774,3 +2776,48 @@ summary {
   .agent-workspace .main-shell,
   .agent-workspace .sidebar-toggle { transition: none; }
 }
+.editable-context-tag {
+  border: 1px solid transparent;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms;
+}
+.tags > .editable-context-tag:hover:not(:disabled) {
+  background: #e3eeff;
+  border-color: #b7cff5;
+}
+.editable-context-tag:focus-visible {
+  outline: 2px solid #4776c5;
+  outline-offset: 3px;
+}
+.editable-context-tag:disabled { cursor: wait; opacity: .6; }
+.condition-tag-editor {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #dce8f7;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
+.condition-tag-editor select { width: 100%; padding: 12px; border: 1px solid #dce8f7; border-radius: 10px; background: white; color: inherit; font: inherit; }
+.condition-tag-editor fieldset { border: 0; padding: 0; margin: 16px 0; min-width: 0; }
+
+.history-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.history-row > .side-history-item, .history-row > .history-entry { flex: 1; min-width: 0; }
+.history-delete { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 32px; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 6px; color: var(--muted); background: transparent; cursor: pointer; }
+.history-delete:hover:not(:disabled) { color: #b42318; background: #fff0ee; }
+.history-delete:focus-visible { outline: 2px solid #056de8; outline-offset: 2px; }
+.history-delete:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.condition-question-options { display: grid; gap: 8px; }
+.condition-question-options .choice { width: 100%; text-align: left; }
+.condition-question-options small { display: block; margin-top: 5px; color: #64748b; font-weight: 400; }
+
+dialog.delete-dialog { position: fixed; inset: 0; margin: auto; width: 470px; max-width: calc(100vw - 40px); max-height: calc(100dvh - 40px); overflow-y: auto; color: #1f3b61; }
+.delete-dialog::backdrop { background: #1f3b6144; backdrop-filter: blur(3px); }
+.delete-question { margin: 22px 0; padding: 18px; border-radius: 10px; background: #f0f6ff; font-size: 14px; line-height: 1.8; overflow-wrap: anywhere; max-height: 180px; overflow-y: auto; white-space: pre-wrap; }
+.delete-dialog-actions { display: flex; gap: 12px; margin-top: 24px; }
+.delete-dialog-actions > button { flex: 1; min-height: 44px; justify-content: center; }
+.delete-cancel { border: 1px solid #dce5f0; border-radius: 10px; background: #fff; color: #526580; cursor: pointer; }
+.delete-cancel:hover { background: #f0f6ff; }
+.delete-dialog button:focus-visible { outline: 2px solid #056de8; outline-offset: 3px; }

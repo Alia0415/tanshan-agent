@@ -18,7 +18,7 @@ export function SearchProgress({ searching, disconnected }: { searching: boolean
   const caption = disconnected
     ? "小山暂时收不到消息了，重新连接后继续查看进展。"
     : elapsed >= 120
-      ? "这次比平时久一些，你可以继续等候，也可以修改条件。"
+      ? "这次比平时久一些，仍在处理中，请再稍等。"
       : elapsed >= 45
         ? "线索还在整理中，谢谢你多给小山一点时间。"
         : searching

@@ -86,6 +86,7 @@ test("retrieval requests ten candidates per query and keeps original links with 
   const counts: number[] = [];
   const results = [post(1), post(2), post(3), post(4), post(5), post(6)];
   const result = await retrieve(session, { search: async (_query, count) => { counts.push(count!); return results; } }, () => true, intelligence);
+  assert.deepEqual(result.conditionTags, ["9000元", "旅行风景"]);
   assert.deepEqual(counts, [10, 10]);
   assert.equal(result.info.candidate_count, 6);
   assert.equal(result.sources.length, 5);
