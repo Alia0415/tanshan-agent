@@ -5,9 +5,20 @@
 ## 位置
 
 - `src/lib/roundtable/`：纯编排引擎与提示词，不依赖数据库、Next.js 或浏览器。
-- `src/lib/server/roundtables.ts`：SQLite 存储（`roundtables` 表，匿名会话隔离，24 小时过期）与知乎直答接线。
-- `src/app/api/roundtables/`：创建、读取、推进、访客发言四个接口。
+- `src/lib/server/roundtables.ts`：SQLite 存储（`roundtables` 表，匿名会话隔离，24 小时过期；`round_requests` 表承担并发控制）与知乎直答接线。
+- `src/app/api/roundtables/`：列表、创建、读取、推进、访客发言五个接口。
 - `src/app/roundtable/`：本地调试页面。
+
+## 接口与并发保护
+
+推进（`POST /api/roundtables/:id/advance`）和访客发言（`POST /api/roundtables/:id/messages`）都要求请求体携带 `requestId`（8–64 位客户端生成的唯一串）与 `revision`（客户端当前持有的圆桌版本号），沿用问答主链路的条件版本 + 请求控制思路：
+
+- **条件版本校验**：每次成功写入都会让 `revision` 加一。请求携带的版本与库中不一致时返回 `409 ROUND_UPDATED`，前端据此静默拉取最新圆桌，不把它当作失败展示。
+- **单飞行槽位**：同一圆桌同时只允许一次"读取 → 等模型 → 保存"在途；第二个并发请求返回 `409 ROUND_BUSY`。槽位由 `round_requests` 表上的部分唯一索引保证，不依赖内存锁。
+- **请求去重**：同一 `requestId` 重复提交时，直接返回当前库中的圆桌而不再次调用付费模型；失败的尝试同样不会自动重放。
+- **重启恢复**：进程启动时把遗留的 `running` 记录标记为 `interrupted`，避免上一进程崩溃留下的槽位永久占用。
+
+`GET /api/roundtables` 返回当前浏览器会话下未过期的圆桌摘要（最新 10 场），前端开局页据此提供"继续上次的圆桌"入口，刷新后可恢复到服务端保存的进度。
 
 ## 调度规则
 
@@ -20,10 +31,12 @@
 ## 边界与约定
 
 - 仅在配置 `ZHIHU_ACCESS_SECRET` 时可用；创建时执行两次真实搜索并去重，帖子不足 4 条时明确拒绝，不编造材料。
-- 模型输出经 zod 校验；无效的角色、发言或引用被丢弃而不是整场失败；付费调用失败不自动重试。
+- 模型输出经 zod 校验；无效的角色、发言或引用被丢弃而不是整场失败。
+- 模型选择：`ZHIHU_ROUNDTABLE_MODEL`（默认跟随 `ZHIHU_ANSWER_MODEL`，再默认 `zhida-thinking-1p5`）。推荐设为 `zhida-fast-1p5`：组局约 4s、每轮 4–13s，而 thinking 约 39s / 23s。快模型偶尔会用散文而不是 JSON 作答，这一种情况会用 `ZHIHU_ROUNDTABLE_FALLBACK_MODEL`（默认 `zhida-thinking-1p5`）补一次；限流、超时和上游错误仍然不自动重试。
+- 前端自动讨论时会在当前发言展示的 16 秒内预取下一轮，模型耗时与播放重叠；访客发言前先吸收在途的预取结果，避免与服务端的单飞行槽位冲突。
 - 来源（含摘要）随圆桌载荷持久化，重启后可继续；本轮未接入应用级配额治理，属后续工作。
 
 ## 验证
 
-- `npm test` 覆盖引擎的角色校验、批量陈述、成对交锋、嘉宾顺序、总结条件与访客发言。
+- `npm test` 覆盖引擎的角色校验、批量陈述、成对交锋、嘉宾顺序、总结条件与访客发言（`tests/roundtable.test.ts`），以及服务端的并发拒绝、版本冲突、请求去重、失败释放槽位、重启恢复与列表隔离（`tests/roundtable-store.test.ts`）。
 - 调试页 `http://localhost:3000/roundtable` 可手动走完整流程。

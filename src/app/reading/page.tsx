@@ -9,7 +9,7 @@ type AnswerSummary = { url: string; author: string; excerpt: string; votes: numb
 type AnswerState = { loading: boolean; error: string; answers: AnswerSummary[] };
 const EMPTY_ANSWERS: AnswerState = { loading: true, error: "", answers: [] };
 const AUTO_ADVANCE_MS = 9000;
-const LINE_HEIGHT = 96; // 与 CSS 中 .moon-line 的高度保持一致，一屏共 5 行
+// 行高由 CSS 变量 --moon-line-h 决定（桌面 96px 一屏 5 行，手机更紧凑），位移公式与之联动
 
 export default function Home() {
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -82,14 +82,14 @@ export default function Home() {
       <section className="moon-lyrics" aria-label="热点问题列表">
         <div className="moon-filter">
           <button className={!searchTerm && view === "hot" ? "selected" : ""} onClick={() => {setQuery(""); browse("");}}>知乎热榜</button>
-          <button className={!searchTerm && view === "history" ? "selected" : ""} onClick={() => {setQuery(""); browse("", "history");}}>曾经上榜</button>
+          <button className={"moon-filter-history" + (!searchTerm && view === "history" ? " selected" : "")} onClick={() => {setQuery(""); browse("", "history");}}>曾经上榜</button>
           {searchTerm && <strong>搜索：{searchTerm}</strong>}
         </div>
         {loading ? <p className="moon-notice" role="status">正在加载真实知乎问题…</p>
           : error ? <div className="moon-notice" role="alert"><p>{error}</p><button onClick={() => browse(searchTerm, view)}>重试</button></div>
           : questions.length === 0 ? <p className="moon-notice">没有找到问题，换一个关键词试试。</p>
           : <div className="moon-lyrics-window">
-              <div className="moon-lyrics-track" style={{ transform: `translateY(calc(50% - ${(safeIndex * LINE_HEIGHT + LINE_HEIGHT / 2)}px))` }}>
+              <div className="moon-lyrics-track" style={{ transform: `translateY(calc(50% - (var(--moon-line-h) * ${safeIndex} + var(--moon-line-h) / 2)))` }}>
                 {questions.map((item, i) => {
                   const distance = Math.abs(i - safeIndex);
                   return <button type="button" key={item.id}

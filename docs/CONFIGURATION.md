@@ -12,7 +12,7 @@
 
 在 `.env.local` 添加 `DEEPSEEK_API_KEY=自己的密钥` 即可启用动态追问。默认模型为 `deepseek-flash`，可用 `DEEPSEEK_MODEL` 覆盖。模型根据原问题、补充和历轮问答，每轮生成一个具体问题和可选回答；每轮重新判断，信息足够就自动开始回答，最多 5 轮，可随时跳过。选项和自由补充连同所回答的问题进入后续检索和总结。密钥只在服务端读取。
 
-`WENSHAN_CLARIFICATION_MODE=auto` 自动根据密钥选择；`deepseek` 强制使用模型并要求密钥；`local` 强制本地规则演示。完全离线的演示/HTTP smoke 应同时设置 `WENSHAN_PROVIDER=demo` 和 `WENSHAN_CLARIFICATION_MODE=local`。模型失败会显示可重试的错误，保留原卡片和输入，不冒充动态追问、不自动重试付费请求；仍可跳过已有追问。
+`WENSHAN_CLARIFICATION_MODE=auto` 自动选择模型：有 DeepSeek 密钥用 DeepSeek，否则用知乎 `zhida-fast-1p5`（依赖 `ZHIHU_ACCESS_SECRET`，走直答额度），两者都未配置才退回本地规则卡片；`deepseek` 强制使用 DeepSeek 并要求密钥；`local` 强制本地规则演示。完全离线的演示/HTTP smoke 应同时设置 `WENSHAN_PROVIDER=demo` 和 `WENSHAN_CLARIFICATION_MODE=local`。模型失败会显示可重试的错误，保留原卡片和输入，不冒充动态追问、不自动重试付费请求；仍可跳过已有追问。
 
 接入依据：[DeepSeek JSON 输出](https://api-docs.deepseek.com/guides/json_mode/)与[对话接口](https://api-docs.deepseek.com/api/create-chat-completion/)。使用原生 fetch、非思考模式和结构校验，服务端超时 30 秒，页面提交等待 45 秒。
 
@@ -22,7 +22,7 @@
 
 相关性与条件匹配度相同时，综合评论数、赞同数和更新时间排序，优先互动较多、时间较近的帖子。使用知乎接口原始 `CommentCount`、`VoteUpCount`、`EditTime`，卡片与文字回复显示实际数值；缺失或非法数据不补成 0。互动量按对数递减加分，避免历史爆款的累计数字压过所有新内容；高热度不能跨越相关性和条件层级。时间字段按「更新于」标注，不当作首次发表时间，也不保证内容中的价格或观点仍然有效。基础检索和模型完全降级时保留原检索顺序，避免未判定相关性就只按热度重排。
 
-`WENSHAN_SEARCH_MODE=auto` 根据密钥启用；`basic` 使用原关键词方式；`deepseek` 尝试模型优化。模型规划/筛选失败时明确提示降级，不自动重试付费模型请求；补搜评估失败也不会重新展示已判定无关的帖子。候选 ID 和支持筛选的原文片段必须通过校验，模型不生成标题、作者或链接。相关性判断不等于事实核验。
+`WENSHAN_SEARCH_MODE=auto` 在配置了任一模型凭证时启用（DeepSeek 优先，否则用知乎 `zhida-fast-1p5`）；`basic` 使用原关键词方式；`deepseek` 尝试模型优化。模型规划/筛选失败时明确提示降级，不自动重试付费模型请求；补搜评估失败也不会重新展示已判定无关的帖子。候选 ID 和支持筛选的原文片段必须通过校验，模型不生成标题、作者或链接。相关性判断不等于事实核验。
 
 正常增加一次规划和一次筛选模型调用，补搜有新结果时再筛选一次；每次搜索优化模型请求最多等待 20 秒。既有的知乎限流、鉴权停止、条件版本和生成幂等机制继续生效。可运行 `npm run test:search` 进行显式真实联调，结果写入已忽略的 `.data/search-quality-check.json`。该小样本检查不能当作通用搜索准确率评测。
 

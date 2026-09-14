@@ -3,6 +3,7 @@ import { buildQueries } from "../domain/clarification";
 import { filterZhihuPosts } from "../domain/sources";
 import { AppError } from "../domain/validation";
 import { deduplicate, type KnowledgeProvider } from "./providers";
+import { modelJsonAvailable } from "./deepseek";
 import { deepseekSearch, normalizeQuery, type SearchIntelligence, type SearchPlan, type SearchReview } from "./search-intelligence";
 import { sourcePreference } from "./source-ranking";
 
@@ -49,7 +50,8 @@ export async function retrieve(
   const mode = process.env.WENSHAN_SEARCH_MODE || "auto";
   if (!["auto", "basic", "deepseek"].includes(mode))
     throw new AppError("CONFIGURATION", "搜索优化模式配置无效。", 503);
-  let model = intelligence || (mode !== "basic" && (mode === "deepseek" || process.env.DEEPSEEK_API_KEY?.trim()) ? deepseekSearch : undefined);
+  // auto: any configured model credential (DeepSeek preferred, Zhihu fallback) enables planning + review.
+  let model = intelligence || (mode !== "basic" && (mode === "deepseek" || modelJsonAvailable()) ? deepseekSearch : undefined);
   const warnings: string[] = [];
   const assertCurrent = () => {
     if (!isCurrent()) throw new AppError("CANCELLED", "本轮检索已取消。", 409);

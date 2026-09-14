@@ -2774,3 +2774,10 @@ summary {
   .agent-workspace .main-shell,
   .agent-workspace .sidebar-toggle { transition: none; }
 }
+
+/* ===== 手机版专属（≤768px）：桌面尺寸保持原设计 ===== */
+@media (max-width: 768px) {
+  /* 底部 tab 已承担导航，顶部产品导航行去掉 */
+  .product-nav { display: none; }
+  .header-nav .nav-about { display: none; }
+}

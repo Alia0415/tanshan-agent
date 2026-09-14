@@ -339,11 +339,6 @@ a:focus-visible {
 .map-intro h2 { margin-top: 6px; font-size: 23px; animation: ink-print 0.8s ease both; }
 .map-intro p { max-width: 720px; margin: 7px 0 0; color: var(--muted); font-size: 13px; animation: ink-print 0.9s ease 0.25s both; }
 
-@keyframes ink-print {
-  0% { opacity: 0; clip-path: inset(0 100% 0 0); }
-  100% { opacity: 1; clip-path: inset(0 0 0 0); }
-}
-
 .sky-map {
   position: relative;
   margin-top: 20px;
@@ -466,10 +461,6 @@ a:focus-visible {
   touch-action: manipulation;
   -webkit-user-drag: none;
 }
-@keyframes sky-fade {
-  0% { opacity: 0; }
-  100% { opacity: 1; }
-}
 
 .sky-dot {
   position: relative;
@@ -508,10 +499,6 @@ a:focus-visible {
 }
 .sky-station.current .sky-dot::before {
   animation: sky-ripple 0.7s ease-out 1 both;
-}
-@keyframes sky-ripple {
-  0% { transform: scale(0.55); opacity: 0.9; }
-  100% { transform: scale(2.4); opacity: 0; }
 }
 
 .sky-tag { display: grid; gap: 2px; max-width: 170px; text-align: center; }
@@ -584,14 +571,6 @@ a:focus-visible {
   background: #0b4bc4;
   transform-origin: left center;
   animation: track-wait 1.8s ease-in-out infinite;
-}
-@keyframes time-fill {
-  0% { transform: translateY(-50%) scaleX(0.04); }
-  100% { transform: translateY(-50%) scaleX(1); }
-}
-@keyframes track-wait {
-  0%, 100% { transform: scaleX(0.25); }
-  50% { transform: scaleX(0.95); }
 }
 
 .source-disclaimer { margin: 16px 0 0; color: var(--muted); font-size: 11px; }
@@ -863,6 +842,29 @@ a:focus-visible {
 
 }
 
+/* Keyframes live outside .reading-scope: only conditional at-rules may nest
+   inside a style rule, and a nested @keyframes fails the whole stylesheet. */
+@keyframes ink-print {
+  0% { opacity: 0; clip-path: inset(0 100% 0 0); }
+  100% { opacity: 1; clip-path: inset(0 0 0 0); }
+}
+@keyframes sky-fade {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes sky-ripple {
+  0% { transform: scale(0.55); opacity: 0.9; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+@keyframes time-fill {
+  0% { transform: translateY(-50%) scaleX(0.04); }
+  100% { transform: translateY(-50%) scaleX(1); }
+}
+@keyframes track-wait {
+  0%, 100% { transform: scaleX(0.25); }
+  50% { transform: scaleX(0.95); }
+}
+
 .reading-scope .intent-bubbles { display: flex; flex-wrap: wrap; gap: 10px; list-style: none; margin: 16px 0 0; padding: 0; }
 .reading-scope .intent-bubbles > li { max-width: 100%; padding: 10px 18px; border: 1px solid var(--blue-line); border-radius: 22px; background: var(--blue-soft); color: var(--blue-dark); font-size: 15px; font-weight: 500; line-height: 1.6; overflow-wrap: anywhere; }
 
@@ -912,6 +914,7 @@ a:focus-visible {
 .moon-notice { color: var(--mq-soft); font-size: 14px; line-height: 2; font-family: var(--serif); }
 .moon-notice button { margin-top: 8px; border: 1px solid var(--mq-text); background: transparent; color: var(--mq-text); padding: 7px 18px; border-radius: 999px; cursor: pointer; }
 .moon-lyrics-window {
+  --moon-line-h: 96px;
   position: relative;
   height: 480px;
   overflow: hidden;
@@ -921,7 +924,7 @@ a:focus-visible {
 .moon-lyrics-track { position: absolute; inset: 0; display: flex; flex-direction: column; transition: transform 0.65s cubic-bezier(0.22, 0.9, 0.28, 1); }
 .moon-line {
   flex: none;
-  height: 96px;
+  height: var(--moon-line-h);
   display: flex;
   align-items: center;
   border: 0;
@@ -1043,4 +1046,65 @@ a:focus-visible {
   .moon-lyrics-window { height: 420px; }
   .moon-line { font-size: 16px; }
   .moon-line.current { font-size: 19px; }
+}
+
+/* ===== 手机版（≤768px）：月亮靠左上只露右半，热点三行贴在月亮正右侧，
+   控制按钮落在月亮下方，热评随之上移；桌面尺寸不受影响 ===== */
+@media (max-width: 768px) {
+  .moon-page { overflow-x: hidden; }
+  .moon-stage {
+    width: 100%;
+    margin: 0;
+    padding: 10px 14px 20px;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    grid-template-areas:
+      "disc filter"
+      "disc lyrics"
+      "controls controls"
+      "answer answer";
+    column-gap: 14px;
+    row-gap: 10px;
+    align-items: start;
+    justify-items: stretch;
+    text-align: left;
+  }
+  /* 让 filter / 列表 / 控制按钮直接参与网格排布 */
+  .moon-lyrics { display: contents; }
+  .moon-filter { grid-area: filter; align-self: end; min-height: 0; }
+  .moon-filter .moon-filter-history { display: none; }
+  .moon-filter button { padding: 3px 10px; font-size: 11px; }
+  .moon-notice { grid-area: lyrics; font-size: 13px; }
+  .moon-lyrics-window {
+    grid-area: lyrics;
+    --moon-line-h: 42px;
+    height: calc(var(--moon-line-h) * 3);
+    width: 100%;
+    align-self: start;
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 22%, #000 78%, transparent 100%);
+    mask-image: linear-gradient(180deg, transparent 0%, #000 22%, #000 78%, transparent 100%);
+  }
+  .moon-line { font-size: 13.5px; line-height: 1.4; opacity: 0; }
+  .moon-line[data-distance="1"] { opacity: 0.45; }
+  .moon-line.current { font-size: 15.5px; }
+  /* 月亮：整体 184px，左移一半再抵消页面内边距，只露出右半部分 */
+  .moon-disc {
+    grid-area: disc;
+    align-self: start;
+    justify-self: start;
+    width: 184px;
+    margin-left: -106px;
+  }
+  .moon-spin { width: 184px; }
+  .moon-disc-img { box-shadow: 0 18px 40px rgba(5, 12, 30, 0.55), 0 0 46px rgba(245, 233, 200, 0.16); }
+  /* 控制按钮：月亮下方、靠左 */
+  .moon-controls { grid-area: controls; justify-self: start; gap: 8px; margin-top: -4px; }
+  .moon-controls button { width: 34px; height: 34px; }
+  .moon-controls .moon-toggle { width: 40px; height: 40px; }
+  .moon-controls-label { display: none; }
+  /* 热评整体上移、占满宽度 */
+  .moon-answer { grid-area: answer; width: 100%; gap: 10px; margin-top: 4px; }
+  .moon-answer h2 { font-size: 19px; line-height: 1.45; }
+  .moon-answer-body p { font-size: 15px; line-height: 1.85; }
 }

@@ -618,7 +618,7 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
             <nav className="header-nav" aria-label="主导航">
               <button type="button" className={historyOpen ? "" : "nav-current"} onClick={() => { setHistoryOpen(false); document.getElementById("main-content")?.scrollIntoView({ behavior: "smooth" }); }}>{session ? "当前提问" : "首页"}</button>
               <button type="button" className={historyOpen ? "nav-current" : ""} onClick={openHistory} disabled={Boolean(busy) || restoring}>历史问题</button>
-              <button type="button" onClick={() => setAbout(true)}>关于问山</button>
+              <button type="button" className="nav-about" onClick={() => setAbout(true)}>关于问山</button>
             </nav>
           </div>
           <div className="topbar-right">

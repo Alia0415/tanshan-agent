@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, Send, Sparkles } from "lucide-react";
-import type { Roundtable } from "@/lib/roundtable/engine";
+import type { Roundtable, RoundtableSummary } from "@/lib/roundtable/engine";
 
 const phaseDividers: Record<string, string> = {
   opening: "圆桌开场",
@@ -181,16 +181,29 @@ export function WeChatChat({
     </div>
   );
 }
+// Debatable, Zhihu-flavoured openers; kept short so every chip stays two lines.
+export const EXAMPLE_QUESTIONS = [
+  "为什么很多人选择读博来延续学生身份？",
+  "年轻人该留在大城市还是回家乡？",
+  "AI 会取代程序员吗？",
+  "提前还房贷真的划算吗？",
+];
 export function WeChatIntro({
   question,
   setQuestion,
   busy,
+  error,
+  recent,
   onStart,
+  onResume,
 }: {
   question: string;
   setQuestion: (value: string) => void;
   busy: string;
+  error: string;
+  recent: RoundtableSummary[];
   onStart: () => void;
+  onResume: (id: string) => void;
 }) {
   return (
     <div className="wechat-phone">
@@ -200,15 +213,35 @@ export function WeChatIntro({
       </header>
       <div className="wechat-body wechat-intro">
         <Sparkles size={30} className="wechat-intro-icon" />
-        <h3>把一个问题交给几个立场</h3>
+        <h3>
+          <span className="copy-desktop">把一个问题交给几个立场</span>
+          <span className="copy-mobile">跟不同观点的代表谈谈</span>
+        </h3>
         <p>真实检索知乎帖子，生成不同立场的 Agent 开一场可插话的圆桌。</p>
+        <div className="wechat-examples" role="group" aria-label="示例问题">
+          <p className="wechat-examples-title">试试这些问题</p>
+          <div className="wechat-examples-grid">
+            {EXAMPLE_QUESTIONS.map((item) => (
+              <button
+                key={item}
+                type="button"
+                className="wechat-example"
+                aria-pressed={question.trim() === item}
+                disabled={Boolean(busy)}
+                onClick={() => setQuestion(item)}
+              >
+                <span>{item}</span>
+              </button>
+            ))}
+          </div>
+        </div>
         <textarea
           aria-label="本场讨论的问题"
           value={question}
           minLength={5}
           maxLength={200}
           onChange={(event) => setQuestion(event.target.value)}
-          placeholder="例如：为什么很多人选择读博来延续学生身份？"
+          placeholder="也可以直接输入你想讨论的问题…"
           disabled={Boolean(busy)}
         />
         <button
@@ -219,8 +252,45 @@ export function WeChatIntro({
         >
           {busy ? <LoaderCircle size={16} className="spin" /> : "组局"}
         </button>
-        {busy && <div className="wechat-typing">正在检索并组建圆桌…</div>}
+        {busy ? (
+          <div className="wechat-typing">{busy}…</div>
+        ) : (
+          recent.length > 0 && (
+            <div className="wechat-resume">
+              <p className="wechat-resume-title">继续上次的圆桌</p>
+              {recent.slice(0, 3).map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="wechat-resume-item"
+                  onClick={() => onResume(item.id)}
+                >
+                  <span className="wechat-resume-question">{item.question}</span>
+                  <span className="wechat-resume-meta">
+                    {item.messages} 条发言 ·{" "}
+                    {item.state === "complete" ? "已总结" : "进行中"} ·{" "}
+                    {formatWhen(item.createdAt)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )
+        )}
+        {error && (
+          <p className="wechat-error" role="alert">
+            {error}
+          </p>
+        )}
       </div>
     </div>
   );
+}
+function formatWhen(iso: string) {
+  const minutes = Math.round((Date.now() - Date.parse(iso)) / 60_000);
+  if (!Number.isFinite(minutes)) return "";
+  if (minutes < 1) return "刚刚";
+  if (minutes < 60) return `${minutes} 分钟前`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} 小时前`;
+  return `${Math.round(hours / 24)} 天前`;
 }

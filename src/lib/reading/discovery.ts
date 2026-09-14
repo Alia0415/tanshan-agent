@@ -1,6 +1,7 @@
 import "server-only";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { assertUpstreamUrl } from "@/lib/server/upstream";
 
 export type Question = {
   id: string; title: string; url: string; summary: string;
@@ -23,7 +24,7 @@ export function questionId(url: unknown): string | undefined {
 export async function api<T>(endpoint: string): Promise<T> {
   const secret = process.env.ZHIHU_ACCESS_SECRET;
   if (!secret) throw new Error("知乎服务尚未配置，请联系维护者。");
-  const response = await fetch("https://developer.zhihu.com" + endpoint, {
+  const response = await fetch(assertUpstreamUrl("https://developer.zhihu.com" + endpoint), {
     headers: { Authorization: "Bearer " + secret, "X-Request-Timestamp": String(Math.floor(Date.now()/1000)) },
     cache: "no-store", signal: AbortSignal.timeout(25000),
   }).catch(() => { throw new Error("暂时无法连接知乎服务，请稍后重试。"); });

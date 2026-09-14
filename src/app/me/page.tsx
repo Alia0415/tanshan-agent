@@ -27,6 +27,12 @@ function formatRemaining(seconds: number) {
   return hours > 0 ? `${hours} 小时 ${minutes} 分钟` : `${minutes} 分钟`;
 }
 
+// This page only talks to its own /api routes; any other target is refused before fetch.
+function sameOriginApi(path: string) {
+  if (!/^\/api\/[\w\-./]+(\?[\w\-.=&%]*)?$/.test(path)) throw new Error("非法的接口路径");
+  return path;
+}
+
 export default function MePage() {
   const [status, setStatus] = useState<Status | null>(null);
   const [notice, setNotice] = useState("");
@@ -37,7 +43,7 @@ export default function MePage() {
 
   useEffect(() => {
     const oauth = new URLSearchParams(window.location.search).get("oauth");
-    fetch("/api/oauth/status", { cache: "no-store" })
+    fetch(sameOriginApi("/api/oauth/status"), { cache: "no-store" })
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error?.message || "读取状态失败");
@@ -56,7 +62,7 @@ export default function MePage() {
     setSection(key);
     setItems([]);
     try {
-      const response = await fetch(path, { cache: "no-store" });
+      const response = await fetch(sameOriginApi(path), { cache: "no-store" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error?.message || "读取失败");
       const payload = data.Data ?? data;
@@ -69,7 +75,7 @@ export default function MePage() {
   }, []);
 
   async function logout() {
-    await fetch("/api/oauth/logout", { method: "POST" }).catch(() => {});
+    await fetch(sameOriginApi("/api/oauth/logout"), { method: "POST" }).catch(() => {});
     setStatus((previous) => (previous ? { ...previous, loggedIn: false } : previous));
     setNotice("已退出知乎登录。");
     setSection("");

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { Session, Source } from "../domain/types";
 import { AppError } from "../domain/validation";
-import { deepseekJson } from "./deepseek";
+import { modelJson } from "./deepseek";
 
 const query = z.string().trim().min(2).max(160);
 const planSchema = z.object({
@@ -88,13 +88,13 @@ JSON 示例：{"items":[{"id":1,"relevance":3,"constraint_fit":"unknown","eviden
 
 export const deepseekSearch: SearchIntelligence = {
   async plan(session) {
-    return parseSearchPlan(await deepseekJson({
+    return parseSearchPlan(await modelJson({
       feature: "SEARCH", instructions: planInstructions,
       input: contextFor(session), maxTokens: 1000, timeoutMs: 20000,
     }));
   },
   async review(session, plan, sources) {
-    const content = await deepseekJson({
+    const content = await modelJson({
       feature: "SEARCH", instructions: reviewInstructions, maxTokens: 5000, timeoutMs: 20000,
       input: {
         ...contextFor(session), plan,

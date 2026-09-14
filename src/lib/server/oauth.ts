@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { db } from "./store";
 import { AppError } from "../domain/validation";
+import { assertUpstreamUrl } from "./upstream";
 
 // 知乎黑客松 OAuth：app_id / app_key 由活动页面分配，回调地址必须与登记值完全一致。
 // app_key 与 OAuth access_token 只在本模块（服务端）出现，绝不写入日志或响应。
@@ -69,7 +70,7 @@ export async function exchangeToken(code: string) {
     redirect_uri: config.redirectUri,
     code,
   });
-  const response = await fetch(TOKEN_ENDPOINT, {
+  const response = await fetch(assertUpstreamUrl(TOKEN_ENDPOINT), {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: form.toString(),
@@ -146,7 +147,7 @@ export async function fetchUserApi(path: string, accessToken: string) {
       "服务端尚未配置 Access Secret。",
       503,
     );
-  const response = await fetch(USER_API_BASE + path, {
+  const response = await fetch(assertUpstreamUrl(USER_API_BASE + path), {
     headers: {
       Authorization: `Bearer ${secret}`,
       "X-OAuth-Token": accessToken,

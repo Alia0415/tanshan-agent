@@ -1,6 +1,7 @@
 import { eligible, getQuestion } from "@/lib/reading/discovery";
 import { agentJSON } from "@/lib/reading/reading-agent";
 import { describeIntent, readHistory } from "@/lib/reading/reading-intent";
+import { assertUpstreamUrl } from "@/lib/server/upstream";
 
 type ZhihuSearchItem = {
   Title: string;
@@ -102,7 +103,7 @@ async function zhihuFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const secret = process.env.ZHIHU_ACCESS_SECRET;
   if (!secret) throw new Error("ZHIHU_SECRET_MISSING");
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(assertUpstreamUrl(`${API_BASE}${path}`), {
     ...init,
     cache: "no-store",
     signal: AbortSignal.timeout(90000),

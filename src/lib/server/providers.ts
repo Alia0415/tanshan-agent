@@ -3,6 +3,7 @@ import { ANSWER_INSTRUCTIONS } from "../agent/definition";
 import type { Answer, AnswerSection, Session, Source } from "../domain/types";
 import { AppError } from "../domain/validation";
 import { isZhihuPostUrl } from "../domain/sources";
+import { assertUpstreamUrl } from "./upstream";
 
 export interface Draft {
   format?: Answer["format"];
@@ -114,7 +115,19 @@ export function parseDraft(
   }
 }
 
-export async function request(url: string, options: RequestInit = {}) {
+// The only Zhihu upstreams this module can reach. Callers pick an entry by key
+// and pass query values separately, so no request URL is ever assembled from
+// caller-supplied strings.
+const ZHIHU_ENDPOINTS = {
+  search: "https://developer.zhihu.com/api/v1/content/zhihu_search",
+  chat: "https://developer.zhihu.com/v1/chat/completions",
+} as const;
+export type ZhihuEndpoint = keyof typeof ZHIHU_ENDPOINTS;
+
+export async function request(
+  endpoint: ZhihuEndpoint,
+  options: RequestInit & { query?: Record<string, string> } = {},
+) {
   const secret = process.env.ZHIHU_ACCESS_SECRET?.trim();
   if (!secret)
     throw new AppError(
@@ -122,17 +135,20 @@ export async function request(url: string, options: RequestInit = {}) {
       "服务暂未配置资料访问凭证，请联系维护者。",
       503,
     );
+  const { query, ...init } = options;
+  const target = new URL(ZHIHU_ENDPOINTS[endpoint]);
+  for (const [key, value] of Object.entries(query ?? {})) target.searchParams.set(key, value);
   const configuredTimeout = Number(process.env.ZHIHU_TIMEOUT_MS || 120000);
   const timeout = Number.isFinite(configuredTimeout)
     ? Math.min(120000, Math.max(1000, configuredTimeout))
     : 120000;
   let response: Response;
   try {
-    response = await fetch(url, {
-      ...options,
+    response = await fetch(assertUpstreamUrl(target.href), {
+      ...init,
       cache: "no-store",
       signal: AbortSignal.timeout(
-        options.method === "POST" ? timeout : Math.min(timeout, 20000),
+        init.method === "POST" ? timeout : Math.min(timeout, 20000),
       ),
       headers: {
         "Content-Type": "application/json",
@@ -256,12 +272,14 @@ export function parseTextDraft(content: string): Draft | undefined {
 
 export class ZhihuProvider implements KnowledgeProvider {
   async search(query: string, count = 5): Promise<Source[]> {
-    const url = new URL(
-      "https://developer.zhihu.com/api/v1/content/zhihu_search",
+    const result = responseSchema.safeParse(
+      await request("search", {
+        query: {
+          Query: query,
+          Count: String(Number.isFinite(count) ? Math.min(10, Math.max(1, Math.floor(count))) : 5),
+        },
+      }),
     );
-    url.searchParams.set("Query", query);
-    url.searchParams.set("Count", String(Number.isFinite(count) ? Math.min(10, Math.max(1, Math.floor(count))) : 5));
-    const result = responseSchema.safeParse(await request(url.href));
     if (!result.success)
       throw new AppError("INVALID_RESPONSE", "搜索结果格式暂时无法读取。", 502);
     if (result.data.Code === 20001)
@@ -311,7 +329,7 @@ export class ZhihuProvider implements KnowledgeProvider {
     if (mode !== "auto")
       throw new AppError("CONFIGURATION", "直答模式配置无效。", 503);
     const result = await request(
-      "https://developer.zhihu.com/v1/chat/completions",
+      "chat",
       {
         method: "POST",
         body: JSON.stringify({

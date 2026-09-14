@@ -2,7 +2,7 @@ import { z } from "zod";
 import { MAX_CLARIFICATION_ROUNDS, type ClarificationCard, type Session } from "../domain/types";
 import { AppError } from "../domain/validation";
 import { nextCard } from "../domain/clarification";
-import { deepseekJson } from "./deepseek";
+import { modelJson, modelJsonAvailable } from "./deepseek";
 
 export type ClarificationPlanner = (session: Session) => Promise<ClarificationCard | undefined>;
 
@@ -61,11 +61,13 @@ export const planClarification: ClarificationPlanner = async (session) => {
   if (!["auto", "local", "deepseek"].includes(mode))
     throw new AppError("CONFIGURATION", "追问模式配置无效。", 503);
   const key = process.env.DEEPSEEK_API_KEY?.trim();
-  if (mode === "local" || (mode === "auto" && !key)) return nextCard(session);
-  if (!key)
+  // auto: DeepSeek when a key exists, else the Zhihu assistant model; rule
+  // cards only when no model credential is configured at all.
+  if (mode === "local" || (mode === "auto" && !modelJsonAvailable())) return nextCard(session);
+  if (mode === "deepseek" && !key)
     throw new AppError("CLARIFICATION_AUTH", "请在服务端配置 DeepSeek API Key 后重试。", 503);
 
-  const content = await deepseekJson({
+  const content = await modelJson({
     feature: "CLARIFICATION", instructions, maxTokens: 900,
     input: {
       original_question: session.original_question,

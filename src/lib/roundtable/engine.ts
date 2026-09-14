@@ -49,6 +49,18 @@ export interface Roundtable {
   commonGround: string[];
   disagreements: string[];
   scheduler: { state: "running" | "complete"; turn: number };
+  // Optimistic-concurrency version owned by the persistence layer: it is
+  // compared against the client's copy before any mutation is accepted.
+  revision: number;
+}
+// Listing projection shown as refresh-recovery entries on the intro screen.
+export interface RoundtableSummary {
+  id: string;
+  question: string;
+  createdAt: string;
+  expiresAt: string;
+  state: "running" | "complete";
+  messages: number;
 }
 export type ModelJson = (prompt: string, payload: unknown) => Promise<unknown>;
 
@@ -285,6 +297,7 @@ export async function createRoundtable(
     commonGround: [],
     disagreements: [],
     scheduler: { state: "running", turn: 0 },
+    revision: 0,
   };
   pushMessage(round, {
     id: `opening-${randomUUID()}`,

@@ -50,12 +50,43 @@
 .wechat-header-title { display: block; font-weight: 600; font-size: 15px; color: #111; }
 .wechat-header-sub { font-size: 11px; color: #999; }
 .wechat-body { flex: 1; overflow-y: auto; padding: 12px 10px 16px; background: #ededed; overscroll-behavior: contain; }
-.wechat-intro { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; }
+.wechat-intro { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 12px; padding: 24px 24px 140px; text-align: center; }
+/* Bottom padding keeps the last card clear of the floating scene/agent controls (.chat-controls-slot, bottom: 96px). */
+/* Auto margins centre short content yet collapse when the column overflows, so the top stays scrollable. */
+.wechat-intro > :first-child { margin-top: auto; }
+.wechat-intro > :last-child { margin-bottom: auto; }
 .wechat-intro-icon { color: #056de8; }
 .wechat-intro h3 { margin: 0; font-size: 17px; color: #111; }
 .wechat-intro p { margin: 0; font-size: 13px; color: #64748b; line-height: 1.6; }
 .wechat-intro textarea { width: 100%; min-height: 84px; border: none; border-radius: 8px; padding: 12px 14px; font-size: 14px; background: #fff; outline: none; resize: vertical; }
 .wechat-intro-go { width: auto; min-width: 120px; height: 42px; padding: 0 26px; gap: 6px; font-weight: 600; letter-spacing: 2px; }
+.wechat-examples { width: 100%; display: flex; flex-direction: column; gap: 6px; }
+.wechat-intro .wechat-examples-title { margin: 0; font-size: 11px; color: #9a9a9a; text-align: center; }
+.wechat-examples-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.wechat-example {
+  display: flex; align-items: center; min-height: 48px; padding: 6px 10px;
+  border: 1px solid #e3e3e3; border-radius: 8px; background: #fff;
+  color: #444; font-size: 12px; line-height: 1.5; text-align: left; cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+}
+.wechat-example span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.wechat-example:hover:not(:disabled), .wechat-example[aria-pressed='true'] { border-color: #056de8; background: #f0f6ff; color: #056de8; }
+.wechat-example:disabled { opacity: 0.55; cursor: default; }
+.wechat-intro .wechat-error { width: 100%; border-radius: 8px; text-align: left; }
+.wechat-resume { width: 100%; display: flex; flex-direction: column; gap: 6px; margin-top: 6px; text-align: left; }
+.wechat-resume-title { margin: 0 0 2px !important; font-size: 11px !important; color: #9a9a9a !important; text-align: center; }
+.wechat-resume-item {
+  display: flex; flex-direction: column; gap: 3px; width: 100%;
+  padding: 9px 12px; border: 1px solid #e3e3e3; border-radius: 8px;
+  background: #fff; text-align: left; cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.wechat-resume-item:hover { border-color: #056de8; background: #f0f6ff; }
+.wechat-resume-question {
+  font-size: 13px; color: #111; line-height: 1.5;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.wechat-resume-meta { font-size: 11px; color: #8c8c8c; }
 .wechat-divider { text-align: center; color: #9a9a9a; font-size: 11px; margin: 12px 0 6px; }
 .wechat-row { display: flex; gap: 8px; margin: 11px 0; align-items: flex-start; }
 .wechat-row.mine { flex-direction: row-reverse; }
@@ -197,4 +228,70 @@
 @keyframes chat-panel-pop {
   from { opacity: 0; transform: translateY(10px) scale(0.96); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* 开局标题文案：桌面与手机各一版 */
+.copy-mobile { display: none; }
+
+/* ===== 手机版（≤768px）：画面置顶、无框无说明文字，聊天框紧贴其下填满剩余高度，
+   整页不滚动、只有聊天区内部滚动；桌面尺寸保持原设计 ===== */
+@media (max-width: 768px) {
+  .copy-desktop { display: none; }
+  .copy-mobile { display: inline; }
+  body:has(.roundtable-page) { overflow: hidden; padding-bottom: 0; }
+  .roundtable-page {
+    /* 精确让出底部 tab 栏（56px + 安全区），聊天框贴到栏顶 */
+    height: calc(100dvh - 56px - env(safe-area-inset-bottom, 0px));
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .roundtable-title { display: none; }
+  .roundtable-live-layout {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    gap: 0;
+  }
+  .roundtable-live-stage { flex: none; gap: 0; }
+  .roundtable-live-stage .room-experience {
+    flex: none;
+    height: auto;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+  /* 画面保持原始比例 1672:941，宽度占满 */
+  .roundtable-live-layout .room-world {
+    width: 100%;
+    aspect-ratio: 1672 / 941;
+    height: auto;
+    max-height: none;
+    margin: 0;
+  }
+  .roundtable-live-stage .room-caption,
+  .roundtable-summary { display: none; }
+  .roundtable-live-chat {
+    position: relative;
+    top: auto;
+    flex: 1;
+    min-height: 0;
+    height: auto;
+  }
+  .roundtable-live-chat .wechat-phone {
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
 }
