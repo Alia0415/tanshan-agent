@@ -12,7 +12,7 @@ import {
 } from "../src/lib/server/resonance";
 
 process.env.WENSHAN_DB_PATH = join(
-  mkdtempSync(join(tmpdir(), "wenshan-resonance-")),
+  mkdtempSync(join(tmpdir(), "tanshan-resonance-")),
   "resonance.sqlite",
 );
 

@@ -20,7 +20,7 @@ export type WaveProgressProps = {
 export function WaveProgress({
   value,
   size = "100%",
-  label = "问山澄清进度",
+  label = "探山澄清进度",
   className = "",
   style,
 }: WaveProgressProps) {

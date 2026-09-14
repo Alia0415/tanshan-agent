@@ -1,6 +1,6 @@
 # Agent 配置与工具映射
 
-这里是问山自身的配置资料，不是知乎官方导入包或 SDK。
+这里是探山自身的配置资料，不是知乎官方导入包或 SDK。
 
 - [SYSTEM_PROMPT.md](SYSTEM_PROMPT.md)：可审阅的人设与对话/工具规则。
 - [OPENING.md](OPENING.md)：开场白与跨领域示例。

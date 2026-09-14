@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-process.env.WENSHAN_DB_PATH = join(mkdtempSync(join(tmpdir(), "wenshan-bookmarks-")), "test.sqlite");
+process.env.WENSHAN_DB_PATH = join(mkdtempSync(join(tmpdir(), "tanshan-bookmarks-")), "test.sqlite");
 import { changeBookmarks, listBookmarks } from "../src/lib/server/bookmarks";
 import { bookmarkActionSchema } from "../src/lib/domain/bookmarks";
 const post = { title: "测试帖子", url: "https://www.zhihu.com/question/12/answer/34?utm_source=test", author: "作者", excerpt: "摘要" };

@@ -26,10 +26,10 @@ export type ResonanceResult = {
   created: boolean;
 };
 
-const state = globalThis as unknown as { wenshanResonance?: boolean };
+const state = globalThis as unknown as { tanshanResonance?: boolean };
 
 function ensureTable() {
-  if (state.wenshanResonance) return;
+  if (state.tanshanResonance) return;
   db().exec(`
     CREATE TABLE IF NOT EXISTS resonance_signals (
       topic_key TEXT NOT NULL,
@@ -47,7 +47,7 @@ function ensureTable() {
     CREATE INDEX IF NOT EXISTS resonance_topic_expiry
       ON resonance_signals(topic_key, expires);
   `);
-  state.wenshanResonance = true;
+  state.tanshanResonance = true;
 }
 
 /**

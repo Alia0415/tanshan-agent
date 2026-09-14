@@ -51,7 +51,7 @@ function RouteIcon() {
 
 function getIntentSummary(history: ReadingTurn[]) {
   if (!history.length) return "你希望先快速了解这个问题的主要观点，不限定具体身份和方向。";
-  return history.map((turn) => `“${turn.answer}”`).join("，") + "。问山会据此安排阅读顺序，并保留其他重要观点。";
+  return history.map((turn) => `“${turn.answer}”`).join("，") + "。探山会据此安排阅读顺序，并保留其他重要观点。";
 }
 
 export default function QuestionReader({ question }: { question: Question }) {
@@ -158,7 +158,7 @@ export default function QuestionReader({ question }: { question: Question }) {
             <span className="zhihu-mark">知</span>
             <span className="zhihu-word">知乎</span>
             <span className="brand-divider" />
-            <span className="wenshan-word">问山</span>
+            <span className="tanshan-word">探山</span>
           </Link>
           <Link className="back-home" href="/">← 返回首页，浏览更多问题</Link>
           <button className="quiet-button" type="button" disabled={isGenerating} onClick={resetSession}>重新开始阅读</button>
@@ -168,7 +168,7 @@ export default function QuestionReader({ question }: { question: Question }) {
       <main id="top" className="page-grid">
         <section className="content-column" aria-label="知乎问题">
           <div className="question-block">
-            <div className="topic-list"><span>知乎问题</span>{assistantEnabled && <span>已记录上榜 · 可用问山阅读</span>}</div>
+            <div className="topic-list"><span>知乎问题</span>{assistantEnabled && <span>已记录上榜 · 可用探山阅读</span>}</div>
             <h1>{question.title}</h1>
             {question.summary && <p className="question-description">{question.summary}</p>}
             <a className="question-original" href={question.url} target="_blank" rel="noreferrer">在知乎查看完整问题与回答</a>
@@ -178,7 +178,7 @@ export default function QuestionReader({ question }: { question: Question }) {
             <div className="agent-heading">
               <div className="agent-name">
                 <span className="agent-icon"><RouteIcon /></span>
-                <div><strong>问山阅读助手</strong><span>先理解你，再整理值得看的观点</span></div>
+                <div><strong>探山阅读助手</strong><span>先理解你，再整理值得看的观点</span></div>
               </div>
               {stage !== "entry" && stage !== "map" && <span className="step-count">{stage === "summary" ? "已理解" : `${questionIndex + 1} / 3`}</span>}
             </div>

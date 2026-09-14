@@ -36,7 +36,7 @@ import type { Answer, Source } from "../src/lib/domain/types";
 import { isZhihuPostUrl } from "../src/lib/domain/sources";
 
 process.env.WENSHAN_DB_PATH = join(
-  mkdtempSync(join(tmpdir(), "wenshan-test-")),
+  mkdtempSync(join(tmpdir(), "tanshan-test-")),
   "sessions.sqlite",
 );
 process.env.WENSHAN_PROVIDER = "live";

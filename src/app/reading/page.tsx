@@ -74,7 +74,7 @@ export default function Home() {
 
   return <div className="app-shell moon-page">
     <header className="topbar"><div className="topbar-inner">
-      <Link className="brand" href="/reading"><span className="zhihu-word">知乎</span><span className="brand-divider"/><span className="wenshan-word">问山</span></Link>
+      <Link className="brand" href="/reading"><span className="zhihu-word">知乎</span><span className="brand-divider"/><span className="tanshan-word">探山</span></Link>
       <form className="discovery-search" onSubmit={submit}><input aria-label="搜索知乎问题" placeholder="搜索你感兴趣的问题" value={query} maxLength={120} onChange={e => setQuery(e.target.value)}/><button type="submit">搜索</button></form>
       <span className="home-label">发现问题</span>
     </div></header>
@@ -120,7 +120,7 @@ export default function Home() {
 
       <section className="moon-answer" aria-label="当前问题的第一条回复">
         {current ? <>
-          <span className="moon-answer-kicker">{searchTerm ? "知乎问题" : view === "history" ? "曾被问山记录在榜" : `热榜第 ${current.rank ?? "—"} 位`} · 知乎问题</span>
+          <span className="moon-answer-kicker">{searchTerm ? "知乎问题" : view === "history" ? "曾被探山记录在榜" : `热榜第 ${current.rank ?? "—"} 位`} · 知乎问题</span>
           <h2><Link prefetch={false} href={"/reading/question/" + current.id}>{current.title}</Link></h2>
           {answerState?.loading ? <p className="moon-answer-hint">正在取来第一条回复……</p>
             : answerState?.error ? <p className="moon-answer-hint moon-answer-error">{answerState.error}</p>
@@ -134,7 +134,7 @@ export default function Home() {
             <a className="moon-answer-origin" href={current.url} target="_blank" rel="noreferrer">在知乎打开原文 ↗</a>
           </div>
         </> : <p className="moon-answer-hint">{loading ? "正在加载知乎热榜…" : "没有找到问题"}</p>}
-        <small className="moon-answer-footnote">内容来自知乎 · 问山阅读</small>
+        <small className="moon-answer-footnote">内容来自知乎 · 探山阅读</small>
       </section>
     </main>
   </div>;
