@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Mountain } from "lucide-react";
 import type { Roundtable } from "@/lib/roundtable/engine";
+import { readStartStream, type PreviewSource } from "@/lib/roundtable/start-stream";
 
 import { RoomStage } from "./roundtable/room-stage";
 import { WeChatChat, WeChatIntro } from "./roundtable/wechat-chat";
@@ -22,7 +23,7 @@ async function api<T>(path: string, method = "GET", payload?: unknown) {
       : {}),
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error?.message || "请求未完成。");
+  if (!response.ok) throw Object.assign(new Error(data.error?.message || "请求未完成。"), { code: data.error?.code });
   return data as T;
 }
 export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?: string }) {
@@ -37,23 +38,28 @@ export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?
   const [playing, setPlaying] = useState(false);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  // Fetch the next turn while the current scene animates, instead of waiting for it.
-  useEffect(() => {
-    if (!playing || busy || !round || round.scheduler.state === "complete") return;
-    const timer = setTimeout(() => void advanceOnce(), 800);
-    return () => clearTimeout(timer);
-  });
+  const [previewSources, setPreviewSources] = useState<PreviewSource[]>([]);
   async function start() {
     if (!question.trim() || busy) return;
     setBusy("正在检索并组建圆桌");
+    setPreviewSources([]);
     setError("");
     try {
-      const result = await api<Roundtable>("/api/roundtables", "POST", {
-        question: question.trim(),
+      const response = await fetch("/api/roundtables", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
+        body: JSON.stringify({ question: question.trim() }),
+        signal: AbortSignal.timeout(150_000),
+      });
+      const result = await readStartStream(response, (message, sources) => {
+        setBusy(message);
+        if (sources) setPreviewSources(sources);
       });
       setRound(result);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "发起失败。");
+      setError(cause instanceof Error && cause.name === "TimeoutError"
+        ? "本次等待超时，请稍后重试。" : cause instanceof Error ? cause.message : "发起失败。");
     } finally {
       setBusy("");
     }
@@ -64,15 +70,23 @@ export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?
     setError("");
     try {
       setRound(
-        await api<Roundtable>(`/api/roundtables/${round.id}/advance`, "POST"),
+        await api<Roundtable>(`/api/roundtables/${round.id}/advance`, "POST", { expectedTurn: round.scheduler.turn }),
       );
     } catch (cause) {
+      // A summary or another tab may own the lock; no paid call has started.
+      if ((cause as { code?: string })?.code === "ROUNDTABLE_BUSY") return;
       setPlaying(false);
       setError(cause instanceof Error ? cause.message : "本轮未完成。");
     } finally {
       setBusy("");
     }
   }
+  // Fetch the next turn while the current scene animates, instead of waiting for it.
+  useEffect(() => {
+    if (!playing || busy || !round || round.scheduler.state === "complete") return;
+    const timer = setTimeout(() => void advanceOnce(), 800);
+    return () => clearTimeout(timer);
+  });
   async function send(content: string) {
     if (!round || busy) return;
     setBusy("Agent 正在回应你");
@@ -105,7 +119,6 @@ export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?
       setBusy("");
     }
   }
-  const complete = round?.scheduler.state === "complete";
   return (
     <main className="roundtable-page">
       <h1 className="roundtable-title">
@@ -127,14 +140,19 @@ export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?
               }
             }
             visible={round?.messages.length ?? 0}
-            playing={playing && !complete}
             scene={scene ?? "night"}
             onScene={setScene}
-            onTurnEnd={() => {}}
           />
           {round && (
             <section className="roundtable-summary">
               <h2>本场资料与结论</h2>
+              {!!round.issues?.length && <>
+                <h3>讨论议题</h3>
+                <ul>{round.issues.map((issue) => <li key={issue.id}>
+                  {issue.question} · {{ open: "待讨论", resolved: "已澄清", needs_evidence: "待补证据", stalled: "保留分歧" }[issue.state]}
+                  {issue.reason && <p>{issue.reason}</p>}
+                </li>)}</ul>
+              </>}
               {round.commonGround.length > 0 && (
                 <>
                   <h3>共识</h3>
@@ -178,11 +196,11 @@ export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?
               error={error}
               playing={playing}
               onSend={(content) => void send(content)}
-              onAdvance={() => void advanceOnce()}
               onTogglePlaying={() => setPlaying(!playing)}
             />
           ) : (
             <WeChatIntro
+              sources={previewSources}
               question={question}
               setQuestion={setQuestion}
               busy={busy}

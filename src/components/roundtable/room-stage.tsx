@@ -3,7 +3,7 @@ import { type DragEvent, useEffect, useRef, useState } from 'react';
 
 import type { Roundtable } from '@/lib/roundtable/engine';
 import './room-stage.css';
-import { conciseClaim } from '@/lib/roundtable/brief';
+import { displayClaim } from '@/lib/roundtable/brief';
 
 export const TURN_MS = 16000;
 const seats = [
@@ -287,32 +287,24 @@ export function RoomStage({
   summaries = {},
   round,
   visible,
-  playing,
   scene,
   onScene,
-  onTurnEnd,
   onJoinGuest,
   canJoinGuest,
 }: {
   summaries?: Record<string, string>;
   round: Pick<Roundtable, "roles" | "messages" | "scheduler">;
   visible: number;
-  playing: boolean;
   scene: string;
   onScene: (scene: string | null) => void;
-  onTurnEnd: () => void;
   onJoinGuest: (id: string) => Promise<boolean>;
   canJoinGuest: boolean;
 }) {
   const [clock, setClock] = useState(0);
   const [playhead, setPlayhead] = useState({ message: '', elapsed: 0 });
   const time = useRef({ message: '', elapsed: 0, last: 0 });
-  const completed = useRef('');
   const message = round.messages[Math.min(visible, round.messages.length) - 1];
-  const shortClaim = message ? conciseClaim(message) || summaries[message.id] : undefined;
-  const bubbleText = shortClaim
-    ? shortClaim.trim().replace(/[。！？!?；;\n\r]+/g, '，').replace(/，+$/g, '') + '。'
-    : undefined;
+  const bubbleText = message ? displayClaim(message, summaries) : undefined;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [guestAgents, setGuestAgents] = useState<GuestAgent[]>([]);
@@ -384,7 +376,8 @@ export function RoomStage({
       const now = performance.now();
       if (time.current.message !== message?.id)
         time.current = { message: message?.id ?? '', elapsed: 0, last: now };
-      if (playing)
+      // React to delivered messages independently of automatic turn generation.
+      if (message)
         time.current.elapsed = Math.min(
           TURN_MS,
           time.current.elapsed + now - time.current.last,
@@ -397,16 +390,8 @@ export function RoomStage({
       });
     }, 100);
     return () => clearInterval(timer);
-  }, [message?.id, playing]);
+  }, [message]);
   const elapsed = playhead.message === message?.id ? playhead.elapsed : 0;
-  useEffect(() => {
-    if (playing && elapsed >= TURN_MS && completed.current !== message?.id) {
-      completed.current = message?.id ?? '';
-      onTurnEnd();
-    }
-    if (!playing) completed.current = '';
-    if (elapsed < TURN_MS) completed.current = '';
-  }, [elapsed, playing, message?.id, onTurnEnd]);
   const tick = reduced ? 0 : Math.floor(clock / 190);
   const state = (active: boolean, index: number): Action => {
     if (!active || elapsed >= 15000) {
@@ -595,7 +580,7 @@ export function RoomStage({
                   walking={direction}
                 />
               </div>
-              {active && action === '发言中' && bubbleText && (
+              {active && elapsed < 11800 && bubbleText && (
                 <div className="room-speech" role="status" aria-label={role.name + '的观点'} key={message.id}>
                   {bubbleText}
                 </div>
@@ -638,9 +623,7 @@ export function RoomStage({
           {round.messages.length > 0 && ` · 第 ${visible} 条发言`}
         </span>
         <p>
-          {elapsed >= 5300 || !playing
-            ? (message?.content ?? '观点角色将根据真实知乎资料生成，发起后在这里入席。')
-            : '正在起身前往圆桌，请稍候…'}
+          {message?.content ?? '观点角色将根据真实知乎资料生成，发起后在这里入席。'}
         </p>
       </div>
     </section>

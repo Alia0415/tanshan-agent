@@ -1,4 +1,5 @@
-import { summarizeMessages } from "../roundtable/brief";
+import { mutateRoundtable } from "./roundtable-mutation";
+import { summarizeMessages, summarizeEvidence } from "../roundtable/brief";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { AppError } from "../domain/validation";
@@ -15,9 +16,9 @@ import { db, ownerHash } from "./store";
 import { deduplicate, request, ZhihuProvider } from "./providers";
 
 type Row = { data: string; owner: string; expires: number };
-const state = globalThis as unknown as { wenshanRounds?: boolean };
+const state = globalThis as unknown as { tanshanRounds?: boolean };
 function ensureTable() {
-  if (state.wenshanRounds) return;
+  if (state.tanshanRounds) return;
   db().exec(`
     CREATE TABLE IF NOT EXISTS roundtables (
       id TEXT PRIMARY KEY,
@@ -27,7 +28,7 @@ function ensureTable() {
     );
     CREATE INDEX IF NOT EXISTS roundtables_expiry ON roundtables(expires);
   `);
-  state.wenshanRounds = true;
+  state.tanshanRounds = true;
 }
 function load(id: string, token: string): Roundtable {
   ensureTable();
@@ -110,8 +111,10 @@ const questionSchema = z.string().trim().min(5).max(200);
 export async function startRoundtable(
   questionInput: string,
   token: string,
+  onProgress?: (message: string, sources?: Source[]) => void,
 ): Promise<Roundtable> {
   const question = questionSchema.parse(questionInput);
+  onProgress?.("正在检索知乎上的真实讨论");
   const provider = new ZhihuProvider();
   // Two queries give the roster enough distinct viewpoints; failures here are
   // surfaced, never filled with invented material.
@@ -133,6 +136,7 @@ export async function startRoundtable(
       "这个问题下可用的真实帖子不足，暂时无法组成圆桌。",
       422,
     );
+  onProgress?.(`已找到 ${sources.length} 条资料，正在整理不同立场和开场白`, sources.slice(0, 12));
   const round = await createRoundtable(
     `round-${randomUUID()}`,
     question,
@@ -149,40 +153,66 @@ export function readRoundtable(id: string, token: string) {
   return load(id, token);
 }
 
-export async function advance(id: string, token: string) {
-  const round = load(id, token);
-  const changed = await advanceRoundtable(round, round.sources, zhihuModel);
-  if (changed) save(round, token);
-  return round;
+async function updateRound<T>(id: string, token: string, work: (round: Roundtable) => Promise<T>) {
+  load(id, token); // Check ownership before acquiring the shared lock.
+  return mutateRoundtable(db(), id, async (assertOwner) => {
+    const round = load(id, token);
+    const result = await work(round);
+    // Fence validation and commit must be atomic even across server processes.
+    db().exec("BEGIN IMMEDIATE");
+    try {
+      assertOwner();
+      load(id, token); // Do not revive a discussion that expired during generation.
+      save(round, token);
+      db().exec("COMMIT");
+    } catch (error) {
+      db().exec("ROLLBACK");
+      throw error;
+    }
+    return result;
+  });
+}
+
+export async function advance(id: string, token: string, expectedTurn?: number) {
+  return updateRound(id, token, async (round) => {
+    if (expectedTurn !== undefined && expectedTurn !== round.scheduler.turn) return round;
+    await advanceRoundtable(round, round.sources, zhihuModel);
+    return round;
+  });
 }
 
 const messageSchema = z.string().trim().min(1).max(300);
-export async function postMessage(
-  id: string,
-  token: string,
-  contentInput: string,
-) {
+export async function postMessage(id: string, token: string, contentInput: string) {
   const content = messageSchema.parse(contentInput);
-  const round = load(id, token);
-  await joinUser(round, round.sources, zhihuModel, content);
-  save(round, token);
-  return round;
+  return updateRound(id, token, async (round) => {
+    await joinUser(round, round.sources, zhihuModel, content);
+    return round;
+  });
 }
 
 export async function inviteGuest(id: string, token: string, guestId: string) {
-  const round = load(id, token);
-  await joinGuest(round, round.sources, zhihuModel, guestId);
-  save(round, token);
-  return round;
+  return updateRound(id, token, async (round) => {
+    await joinGuest(round, round.sources, zhihuModel, guestId);
+    return round;
+  });
+}
+
+export async function completeEvidence(id: string, token: string, ids: string[]) {
+  return updateRound(id, token, async (round) => {
+    const summaries = await summarizeEvidence(round, ids, zhihuModel);
+    for (const message of round.messages) {
+      if (summaries[message.id]) message.evidencePoints = summaries[message.id];
+    }
+    return summaries;
+  });
 }
 
 export async function completeBriefs(id: string, token: string, ids: string[]) {
-  const summaries = await summarizeMessages(load(id, token), ids, zhihuModel);
-  // Reload after the model call so concurrent discussion turns are preserved.
-  const latest = load(id, token);
-  for (const message of latest.messages) {
-    if (summaries[message.id]) message.summary = summaries[message.id];
-  }
-  save(latest, token);
-  return summaries;
+  return updateRound(id, token, async (round) => {
+    const summaries = await summarizeMessages(round, ids, zhihuModel);
+    for (const message of round.messages) {
+      if (summaries[message.id]) message.summary = summaries[message.id];
+    }
+    return summaries;
+  });
 }
