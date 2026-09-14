@@ -735,12 +735,8 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
 
               <div className={homeStyles.hero}>
                 <h1 id="landing-title">
-                  你好，<em>这里是问山。</em>
+                  你好，<em>这里是问山</em>
                 </h1>
-                <p className={homeStyles.lead}>多问一句，答案更近一步。</p>
-                <p className={homeStyles.supportingCopy}>
-                  说说你的问题和处境，一起找到适合你的知乎经验。
-                </p>
               </div>
 
               <nav className={homeStyles.entries} aria-label="其他入口">
