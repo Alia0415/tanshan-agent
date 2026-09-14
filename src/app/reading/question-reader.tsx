@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import type { Question } from "@/lib/reading/discovery";
 import { BookmarkButton } from "@/components/bookmarks";
@@ -20,6 +20,12 @@ type Post = {
   commentCount: number;
   editTime: number;
   readTime: string;
+  focus?: string;
+};
+
+type MindMap = {
+  thesis: string;
+  branches: Array<{ label: string; points: string[] }>;
 };
 
 type Category = {
@@ -48,6 +54,27 @@ function stationPos(index: number, total: number) {
   const y = 74 - 56 * (0.5 - 0.5 * Math.cos(Math.PI * t)) + (index % 2 === 0 ? 0 : 4);
   return { x, y };
 }
+
+const ORBIT_LAYOUTS = [
+  [{x: 70, y: -112}, {x: 142, y: -62}, {x: 154, y: 12}, {x: 110, y: 82}, {x: 34, y: 112}],
+  [{x: -138, y: -76}, {x: -18, y: -132}, {x: 130, y: -76}, {x: 145, y: 42}, {x: -86, y: 104}],
+  [{x: -142, y: -54}, {x: -58, y: -118}, {x: 62, y: -108}, {x: 144, y: -28}, {x: 108, y: 76}],
+  [{x: -158, y: -18}, {x: -146, y: 58}, {x: -88, y: 116}, {x: -8, y: 126}, {x: 36, y: 66}],
+] as const;
+
+function orbitPlacement(index: number, stationIndex: number) {
+  const layout = ORBIT_LAYOUTS[Math.max(0, Math.min(ORBIT_LAYOUTS.length - 1, stationIndex))];
+  const point = layout[index % layout.length];
+  return {
+    ...point,
+    angle: Math.atan2(point.y, point.x) * (180 / Math.PI),
+    length: Math.max(34, Math.hypot(point.x, point.y) - 58),
+  };
+}
+
+function compactPostFocus(post: Post) {
+  return post.focus?.trim() || post.title.trim() || "查看原文";
+}
 const SKY_TRAIL = (() => {
   const points: string[] = [];
   for (let step = 0; step <= 24; step++) {
@@ -71,18 +98,6 @@ function RouteIcon() {
 
 export default function QuestionReader({ question }: { question: Question }) {
   const assistantEnabled = Boolean(question.firstSeenHot);
-  const [ordinary, setOrdinary] = useState<Array<{url: string; author: string; excerpt: string; votes: number}>>([]);
-  const [ordinaryLoading, setOrdinaryLoading] = useState(true);
-  const [ordinaryError, setOrdinaryError] = useState("");
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch("/api/reading/questions/" + question.id + "/answers", {signal: controller.signal})
-      .then(async response => { const data = await response.json(); if (!response.ok) throw new Error(data.error); return data; })
-      .then(data => setOrdinary(data.answers))
-      .catch(error => { if (!controller.signal.aborted) setOrdinaryError(error.message); })
-      .finally(() => { if (!controller.signal.aborted) setOrdinaryLoading(false); });
-    return () => controller.abort();
-  }, [question.id]);
   const [stage, setStage] = useState<Stage>("entry");
   const [questionIndex, setQuestionIndex] = useState(0);
   const [clarifyQuestion, setClarifyQuestion] = useState<ClarifyQuestion | null>(null);
@@ -92,11 +107,67 @@ export default function QuestionReader({ question }: { question: Question }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-  const [mapSummary, setMapSummary] = useState("");
+  const [postMindMaps, setPostMindMaps] = useState<Record<string, MindMap>>({});
+  const [mindMapLoadingIds, setMindMapLoadingIds] = useState<Set<string>>(new Set());
+  const [mindMapErrors, setMindMapErrors] = useState<Record<string, string>>({});
   const [isGenerating, setIsGenerating] = useState(false);
   const [apiError, setApiError] = useState("");
-  const [visitedIds, setVisitedIds] = useState<Set<string>>(new Set());
+  const [furthestStop, setFurthestStop] = useState(0);
+  const [focusedCategoryId, setFocusedCategoryId] = useState("");
   const selectedCategory = categories.find((category) => category.id === selectedCategoryId) ?? categories[0];
+  const selectedPostKey = selectedPost ? (selectedPost.contentId || selectedPost.url) : "";
+  const selectedMindMap = selectedPostKey ? postMindMaps[selectedPostKey] : undefined;
+  const focusedCategoryIndex = categories.findIndex((category) => category.id === focusedCategoryId);
+  const focusedCategory = focusedCategoryIndex >= 0 ? categories[focusedCategoryIndex] : undefined;
+  const focusedPosition = focusedCategory ? stationPos(focusedCategoryIndex, categories.length) : undefined;
+  const routeProgress = categories.length > 1 ? 8 + (84 * furthestStop) / (categories.length - 1) : categories.length ? 8 : 0;
+
+  useEffect(() => {
+    if (!focusedCategoryId) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFocusedCategoryId("");
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [focusedCategoryId]);
+
+  async function loadPostMindMap(post: Post, force = false) {
+    const key = post.contentId || post.url;
+    if (!force && (postMindMaps[key] || mindMapLoadingIds.has(key))) return;
+
+    setMindMapLoadingIds((current) => new Set(current).add(key));
+    setMindMapErrors((current) => {
+      const next = {...current};
+      delete next[key];
+      return next;
+    });
+    try {
+      const response = await fetch("/api/reading/mind-map", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({contentId: post.contentId, title: post.title, excerpt: post.excerpt}),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.mindMap) throw new Error(result.error || "思维导图暂时无法生成。");
+      setPostMindMaps((current) => ({...current, [key]: result.mindMap}));
+    } catch (error) {
+      setMindMapErrors((current) => ({
+        ...current,
+        [key]: error instanceof Error ? error.message : "思维导图暂时无法生成。",
+      }));
+    } finally {
+      setMindMapLoadingIds((current) => {
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      });
+    }
+  }
+
+  function openPost(post: Post) {
+    setSelectedPost(post);
+    void loadPostMindMap(post);
+  }
 
   async function loadClarifyingQuestion(nextHistory: ReadingTurn[] = []) {
     setIsClarifying(true);
@@ -130,6 +201,7 @@ export default function QuestionReader({ question }: { question: Question }) {
     setIsGenerating(true);
     setApiError("");
     setSelectedPost(null);
+    setFocusedCategoryId("");
     try {
       const response = await fetch("/api/reading/reading-map", {
         method: "POST",
@@ -143,8 +215,7 @@ export default function QuestionReader({ question }: { question: Question }) {
       if (!response.ok) throw new Error(result.error || "真实内容整理失败，请重试。");
       setCategories(result.categories);
       setSelectedCategoryId(result.categories[0]?.id ?? "");
-      setVisitedIds(new Set(result.categories[0] ? [result.categories[0].id] : []));
-      setMapSummary(result.summary);
+      setFurthestStop(0);
       setStage("map");
     } catch (error) {
       setApiError(error instanceof Error ? error.message : "真实内容整理失败，请重试。");
@@ -161,10 +232,10 @@ export default function QuestionReader({ question }: { question: Question }) {
     setCategories([]);
     setSelectedCategoryId("");
     setSelectedPost(null);
-    setMapSummary("");
     setApiError("");
     setIsGenerating(false);
-    setVisitedIds(new Set());
+    setFurthestStop(0);
+    setFocusedCategoryId("");
     setStage("entry");
   }
 
@@ -186,10 +257,9 @@ export default function QuestionReader({ question }: { question: Question }) {
       <main id="top" className="page-grid">
         <section className="content-column" aria-label="知乎问题">
           <div className="question-block">
-            <div className="topic-list"><span>知乎问题</span>{assistantEnabled && <span>已记录上榜 · 可用问山阅读</span>}</div>
             <h1>{question.title}</h1>
             {question.summary && <p className="question-description">{question.summary}</p>}
-            <div className="reading-handoffs"><Link href={"/roundtable?q=" + encodeURIComponent(question.title)}>带到圆桌讨论 →</Link><Link href={"/?q=" + encodeURIComponent(question.title)}>向 Agent 提问 →</Link></div><a className="question-original" href={question.url} target="_blank" rel="noreferrer">在知乎查看完整问题与回答</a>
+            <div className="reading-handoffs"><Link href={"/roundtable?q=" + encodeURIComponent(question.title)}>带到圆桌讨论 →</Link><Link href={"/?q=" + encodeURIComponent(question.title)}>向 Agent 提问 →</Link></div>
           </div>
 
           {assistantEnabled && stage === "entry" && (
@@ -203,17 +273,16 @@ export default function QuestionReader({ question }: { question: Question }) {
 
           {assistantEnabled && stage !== "entry" && <section className={`agent-surface stage-${stage}`} aria-live="polite">
             <div className="agent-heading">
-              <div className="agent-name">
-                <span className="agent-icon"><RouteIcon /></span>
-                <div><strong>问山阅读助手</strong></div>
-              </div>
-              {stage !== "map" && <span className="step-count">{stage === "summary" ? "已理解" : `${questionIndex + 1} / 3`}</span>}
+              <strong className="agent-name">{stage === "map" ? "阅读地图" : "生成阅读地图"}</strong>
+              {stage === "map"
+                ? <button className="secondary-button" type="button" onClick={() => setStage("summary")}>调整关注点</button>
+                : <span className="step-count">{stage === "summary" ? "已理解" : `${questionIndex + 1} / 3`}</span>}
             </div>
 
                 {stage === "clarifying" && clarifyQuestion && (
                   <div className="clarifying-panel">
                 <div className="progress-track" aria-hidden="true"><span style={{ width: `${((questionIndex + 1) / 3) * 100}%` }} /></div>
-                <div className="agent-question"><span className="agent-avatar">山</span><div><h2>{clarifyQuestion.prompt}</h2><p>{clarifyQuestion.hint}</p></div></div>
+                <div className="agent-question"><h2>{clarifyQuestion.prompt}</h2><p>{clarifyQuestion.hint}</p></div>
                 <div className="option-list" role="radiogroup" aria-label={clarifyQuestion.prompt}>
                   {clarifyQuestion.options.map((option) => {
                     const selected = selectedAnswer === option.label;
@@ -249,75 +318,87 @@ export default function QuestionReader({ question }: { question: Question }) {
 
             {stage === "map" && (
               <div className="map-panel">
-                <div className="map-intro">
-                  <div><h2>阅读地图</h2><p>{mapSummary}</p></div>
-                  <button className="secondary-button" type="button" onClick={() => setStage("summary")}>调整关注点</button>
-                </div>
-
                 <div className="map-stage-layout">
                   <div className="map-stage-main">
-                    <div className="sky-map" role="group" aria-label="登山阅读路线">
+                    <div className={`sky-map${focusedCategory ? " has-orbit" : ""}`} role="group" aria-label="登山阅读路线">
                       <ParticleField className="sky-particles" />
                       <svg className="sky-trail" viewBox="0 0 100 52" preserveAspectRatio="none" aria-hidden="true">
-                        <path d={SKY_TRAIL} className="sky-path" />
+                        <path d={SKY_TRAIL} className="sky-path" pathLength="100" />
+                        <path d={SKY_TRAIL} className="sky-path-progress" pathLength="100" style={{ strokeDashoffset: 100 - routeProgress }} />
                       </svg>
-                      <div className="sky-progress" aria-hidden="true"><span>{visitedIds.size} / {categories.length} 站已探索</span></div>
-                      <div className="sky-summit" aria-hidden="true">
-                        <svg viewBox="0 0 40 26" fill="none">
-                          <path d="M2 24 13 5l6.5 10L24 8l14 16z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-                          <path d="M13 5l2.6 4-1.8 1.4L17 13" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
-                        </svg>
-                        <span>登顶 · 观点全貌</span>
-                      </div>
-                      <div className="sky-start">
-                        <span>起点 · 当前问题</span>
-                        <strong>{question.title}</strong>
-                      </div>
+                      <div className="sky-progress" aria-hidden="true"><span>已走到第 {furthestStop + 1} 站</span></div>
                       {categories.map((category, index) => {
                         const pos = stationPos(index, categories.length);
                         const selected = selectedCategory?.id === category.id;
-                        const visited = visitedIds.has(category.id);
+                        const visited = index <= furthestStop;
                         return (
                           <button
                             key={category.id}
                             type="button"
                             draggable={false}
                             onDragStart={(event) => event.preventDefault()}
-                            className={`sky-station${selected ? " current" : ""}${visited ? " visited" : ""}`}
+                            className={`sky-station${selected ? " current" : ""}${visited ? " visited" : ""}${focusedCategoryId === category.id ? " orbit-center" : ""}`}
                             style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
                             onClick={() => {
                               setSelectedCategoryId(category.id);
                               setSelectedPost(null);
-                              setVisitedIds((previous) => new Set(previous).add(category.id));
+                              setFurthestStop((previous) => Math.max(previous, index));
+                              setFocusedCategoryId((current) => current === category.id ? "" : category.id);
                             }}
                             aria-pressed={selected}
-                            aria-label={`第 ${index + 1} 站，${category.title}，包含 ${category.posts.length} 篇帖子`}
+                            aria-expanded={focusedCategoryId === category.id}
+                            aria-label={`第 ${index + 1} 站，${category.phase}`}
                           >
                             <span className="sky-dot"><b>{String(index + 1).padStart(2, "0")}</b></span>
                             <span className="sky-tag">
-                              <strong>{category.title}</strong>
-                              <small>{category.posts.length} 篇 · {category.phase}</small>
+                              <strong>{category.phase}</strong>
                             </span>
                           </button>
                         );
                       })}
+                      {focusedCategory && focusedPosition && (
+                        <>
+                          <button className="orbit-dismiss" type="button" onClick={() => setFocusedCategoryId("")} aria-label="退出分类聚焦" />
+                          <div
+                            className="orbit-cluster"
+                            key={focusedCategory.id}
+                            style={{ left: `${focusedPosition.x}%`, top: `${focusedPosition.y}%` }}
+                            aria-label={`${focusedCategory.title}的精选文章`}
+                          >
+                            <span className="orbit-halo" aria-hidden="true" />
+                            {focusedCategory.posts.slice(0, 5).map((post, index) => {
+                              const placement = orbitPlacement(index, focusedCategoryIndex);
+                              const orbitStyle = {
+                                "--orbit-x": `${placement.x}px`,
+                                "--orbit-y": `${placement.y}px`,
+                                "--orbit-angle": `${placement.angle}deg`,
+                                "--orbit-length": `${placement.length}px`,
+                                "--orbit-delay": `${index * 0.12}s`,
+                                "--orbit-drift-delay": `${index * -1.7}s`,
+                              } as CSSProperties;
+                              return (
+                                <div className="orbit-item" style={orbitStyle} key={post.contentId || post.url}>
+                                  <span className="orbit-spoke" aria-hidden="true" />
+                                  <span className="orbit-position">
+                                    <a
+                                      className="orbit-post"
+                                      href={post.url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      title={post.title}
+                                    >
+                                      <strong>{compactPostFocus(post)}</strong>
+                                      <small>{post.voteUpCount} 赞同 · 知乎 ↗</small>
+                                    </a>
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
                     </div>
 
-                    <div className="journey-bar" aria-label="阅读旅程">
-                      {categories.map((category, index) => {
-                        const selected = selectedCategory?.id === category.id;
-                        const visited = visitedIds.has(category.id);
-                        return (
-                          <div key={category.id} className={`journey-stop${selected ? " current" : ""}${visited ? " past" : ""}`}>
-                            <span className="journey-number">{String(index + 1).padStart(2, "0")}</span>
-                            <span className="journey-label">{category.title}</span>
-                            {index < categories.length - 1 && (
-                              <span className={`journey-line${selected ? " current" : visited ? " past" : ""}`} aria-hidden="true" style={{ animationDelay: `${0.3 + index * 0.15}s` }} />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
                   </div>
 
                   <aside className="map-stage-aside" aria-label="本分类事件列表">
@@ -334,7 +415,7 @@ export default function QuestionReader({ question }: { question: Question }) {
                         <div className="category-post-list" role="list">
                           {selectedCategory.posts.map((post, index) => (
                             <article className="category-post-row" key={post.contentId} role="listitem">
-                              <button type="button" onClick={() => setSelectedPost(post)} aria-label={`查看帖子：${post.title}`}>
+                              <button type="button" onClick={() => openPost(post)} aria-label={`查看帖子：${post.title}`}>
                                 <span className="post-list-index">{String(index + 1).padStart(2, "0")}</span>
                                 <span className="post-list-copy">
                                   <strong>{post.title}</strong>
@@ -357,18 +438,6 @@ export default function QuestionReader({ question }: { question: Question }) {
           </section>}
         </section>
 
-        <aside className="side-column" aria-label="阅读提示">
-          {stage !== "map" && (
-            <section className="answer-preview" aria-label="普通回答列表预览">
-              <div className="answer-toolbar"><strong>这个问题下的回答</strong><span>摘要</span></div>
-              {ordinaryLoading ? <p className="feed-notice" role="status">正在加载回答摘要…</p> : ordinaryError ? <p className="feed-notice" role="alert">{ordinaryError}</p> : ordinary.length === 0 ? <p className="feed-notice">暂未检索到这个问题的回答摘要，可前往知乎阅读。</p> :
-                ordinary.map(item => <article className="ordinary-answer" key={item.url}><strong>{item.author}</strong><p>{item.excerpt}</p><div><span>{item.votes} 赞同</span><a href={item.url} target="_blank" rel="noreferrer">阅读完整回答</a><BookmarkButton corner post={{ url: item.url, title: question.title, author: item.author, excerpt: item.excerpt }} /></div></article>)}
-              <a className="all-answers" href={question.url} target="_blank" rel="noreferrer">前往知乎查看全部回答</a>
-            </section>
-          )}
-          <div className="side-card"><h2>这次阅读</h2><dl><div><dt>问题类型</dt><dd>{assistantEnabled ? "已记录上榜" : "普通问题"}</dd></div><div><dt>整理方式</dt><dd>{assistantEnabled ? "按你的关注点" : "浏览回答"}</dd></div><div><dt>内容来源</dt><dd>知乎回答与文章</dd></div></dl></div>
-
-        </aside>
       </main>
 
       {selectedPost && selectedCategory && (
@@ -382,11 +451,36 @@ export default function QuestionReader({ question }: { question: Question }) {
               <span className="demo-badge">知乎{selectedPost.contentType === "Article" ? "文章" : "回答"}</span>
               <BookmarkButton corner post={selectedPost} /><h2 id="post-title">{selectedPost.title}</h2>
               <p className="post-byline">{selectedPost.author}{selectedPost.authorBadge ? ` · ${selectedPost.authorBadge}` : ""} · {selectedPost.readTime} · {selectedPost.voteUpCount} 赞同 · {selectedPost.commentCount} 评论</p>
-              <p className="post-lead">{selectedPost.excerpt}</p>
-              <div className="post-context">
-                <span>为什么先看这一类</span>
-                <p>{selectedCategory.reason}</p>
-              </div>
+              <section className="post-mind-map" aria-label="文章思维导图">
+                <div className="mind-map-heading">
+                  <div><span>30 秒看懂</span><h3>文章思维导图</h3></div>
+                  <small>基于知乎搜索摘要生成</small>
+                </div>
+                {selectedMindMap ? (
+                  <div className="mind-map-canvas">
+                    <div className="mind-map-center">
+                      <span>文章主旨</span>
+                      <strong>{selectedMindMap.thesis}</strong>
+                    </div>
+                    {selectedMindMap.branches.map((branch, index) => (
+                      <article className={"mind-map-branch branch-" + (index + 1)} key={branch.label + index}>
+                        <h4><span>{String(index + 1).padStart(2, "0")}</span>{branch.label}</h4>
+                        <ul>{branch.points.map((point) => <li key={point}>{point}</li>)}</ul>
+                      </article>
+                    ))}
+                  </div>
+                ) : mindMapLoadingIds.has(selectedPostKey) ? (
+                  <div className="mind-map-loading" role="status">
+                    <span>正在提炼文章结构与观点…</span>
+                    <div>{[0, 1, 2, 3].map((item) => <i key={item} />)}</div>
+                  </div>
+                ) : (
+                  <div className="mind-map-error" role="alert">
+                    <p>{mindMapErrors[selectedPostKey] || "思维导图暂时无法生成。"}</p>
+                    <button type="button" onClick={() => void loadPostMindMap(selectedPost, true)}>重新生成</button>
+                  </div>
+                )}
+              </section>
               <div className="post-takeaways">
                 <h3>读这篇时，可以留意</h3>
                 {selectedCategory.views.map((view, index) => <p key={view}><span>{index + 1}</span>{view}</p>)}
