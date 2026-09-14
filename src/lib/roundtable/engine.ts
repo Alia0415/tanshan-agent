@@ -30,6 +30,8 @@ export interface RoundMessage {
   speaker: string;
   phase: RoundPhase;
   content: string;
+  summary?: string;
+  brief?: { topic?: string; claim: string; evidence: string };
   replyTo?: string;
   citations: number[];
   order: number;
@@ -44,6 +46,7 @@ export interface Roundtable {
   // Sources are embedded so knowledge bases stay intact across restarts;
   // only their ids appear in citations.
   sources: Source[];
+  joinedGuestIds?: string[];
   roles: RoundRole[];
   messages: RoundMessage[];
   commonGround: string[];
@@ -51,6 +54,12 @@ export interface Roundtable {
   scheduler: { state: "running" | "complete"; turn: number };
 }
 export type ModelJson = (prompt: string, payload: unknown) => Promise<unknown>;
+
+const briefSchema = z.object({
+  topic: z.string().trim().min(1).max(200).optional().catch(undefined),
+  claim: z.string().trim().min(1).max(40),
+  evidence: z.string().trim().min(1).max(60),
+}).optional().catch(undefined);
 
 const EXCHANGES_PER_ROLE = 2;
 const MAX_MESSAGES = 24;
@@ -110,7 +119,8 @@ function validCitations(value: unknown, role: RoundRole, sources: Source[]) {
 function schedulerInput(question: string, sources: Source[], round: Roundtable, candidates: string[]) {
   return {
     question,
-    sources: sources.map(({ id, title, excerpt, author, url }) => ({
+    // Viewpoint sources already live in each candidate knowledge base.
+    sources: (candidates.length ? [] : sources).map(({ id, title, excerpt, author, url }) => ({
       id,
       title,
       excerpt,
@@ -194,6 +204,8 @@ function appendTurn(
     speaker,
     phase,
     content,
+    summary: text(turn.summary, 90),
+    brief: briefSchema.parse(turn.brief),
     replyTo,
     citations: validCitations(turn.citations, role, sources),
   });
@@ -207,7 +219,11 @@ export async function createRoundtable(
   model_name: string | null,
 ): Promise<Roundtable> {
   const rosterSchema = z.object({
-    opening: z.object({ content: z.string().min(1).max(1200) }),
+    opening: z.object({
+      content: z.string().min(1).max(1200),
+      summary: z.string().trim().min(1).max(90).optional().catch(undefined),
+      brief: briefSchema,
+    }),
     roles: z
       .array(
         z.object({
@@ -276,11 +292,8 @@ export async function createRoundtable(
         sourceIds: sources.map((source) => source.id),
       },
       ...roles,
-      ...GUESTS.map((guest) => ({
-        ...guest,
-        sourceIds: sources.map((source) => source.id),
-      })),
     ],
+    joinedGuestIds: [],
     messages: [],
     commonGround: [],
     disagreements: [],
@@ -291,6 +304,8 @@ export async function createRoundtable(
     speaker: "host",
     phase: "opening",
     content: parsed.data.opening.content.trim(),
+    summary: parsed.data.opening.summary,
+    brief: parsed.data.opening.brief,
     citations: [],
   });
   return round;
@@ -353,6 +368,8 @@ export async function advanceRoundtable(
   ) {
     const schema = z.object({
       content: z.string().min(1).max(2000),
+      summary: z.string().trim().min(1).max(90).optional().catch(undefined),
+      brief: briefSchema,
       citations: z.array(z.number().int().positive()).min(1).max(8),
       commonGround: z.array(z.string().max(120)).max(4).catch([]),
       disagreements: z.array(z.string().max(120)).max(4).catch([]),
@@ -379,6 +396,8 @@ export async function advanceRoundtable(
       speaker: "host",
       phase: "summary",
       content: parsed.data.content.trim(),
+      summary: parsed.data.summary,
+      brief: parsed.data.brief,
       citations,
     });
     round.commonGround = parsed.data.commonGround;
@@ -388,64 +407,6 @@ export async function advanceRoundtable(
       turn: round.messages.length - 1,
     };
     return true;
-  }
-  // After every two viewpoint exchanges the host invites one unused guest to
-  // interject: challenge, fact-check or add unseen context.
-  if (
-    viewpointExchanges.length >= 2 &&
-    viewpointExchanges.length % 2 === 0 &&
-    viewpointExchanges.length < 10 &&
-    !GUEST_IDS.includes(round.messages.at(-1)?.speaker || "")
-  ) {
-    const spoken = new Set(
-      round.messages
-        .map((message) => message.speaker)
-        .filter((id) => GUEST_IDS.includes(id)),
-    );
-    const guest = GUESTS.find((entry) => !spoken.has(entry.id));
-    if (guest) {
-      try {
-        const schema = z.object({
-          content: z.string().min(1).max(1000),
-          citations: z.array(z.number().int().positive()).max(6).catch([]),
-        });
-        const parsed = schema.safeParse(
-          await model(
-            GUEST_PROMPTS[guest.id],
-            schedulerInput(round.question, sources, round, []),
-          ),
-        );
-        if (!parsed.success) throw new Error("invalid guest output");
-        const known = new Set(sources.map((source) => source.id));
-        const cited = parsed.data.citations
-          .filter((id) => known.has(id))
-          .slice(0, 4);
-        const target = [...round.messages]
-          .reverse()
-          .find(
-            (message) =>
-              !GUEST_IDS.includes(message.speaker) &&
-              message.speaker !== "host" &&
-              message.phase !== "summary",
-          );
-        pushMessage(round, {
-          id: `${guest.id}-${randomUUID()}`,
-          speaker: guest.id,
-          phase: "exchange",
-          content: parsed.data.content.trim(),
-          replyTo: guest.id === "guest-counter" ? target?.id : undefined,
-          citations:
-            guest.id === "guest-counter"
-              ? []
-              : cited.length
-                ? cited
-                : sources.slice(0, 2).map((source) => source.id),
-        });
-        return true;
-      } catch {
-        // A guest failure must not stall the debate; fall through to a pair.
-      }
-    }
   }
   const previous = round.messages.at(-1)?.speaker;
   let candidates = viewpoints;
@@ -518,3 +479,54 @@ export async function joinUser(
 }
 
 export const guestName = (id: string) => guestFor(id)?.name ?? id;
+
+// Only an explicit scene drop may invoke a library guest.
+export async function joinGuest(round: Roundtable, sources: Source[], model: ModelJson, id: string): Promise<void> {
+  const guest = guestFor(id);
+  if (!guest) throw new AppError("INVALID_GUEST", "未知的 Agent。", 400);
+  if (round.joinedGuestIds?.includes(id)) return;
+  const schema = z.object({
+    content: z.string().min(1).max(1000),
+    summary: z.string().trim().min(1).max(90).optional().catch(undefined),
+    brief: briefSchema,
+    citations: z.array(z.number().int().positive()).max(6).catch([]),
+  });
+  const parsed = schema.safeParse(
+    await model(
+      GUEST_PROMPTS[guest.id],
+      schedulerInput(round.question, sources, round, []),
+    ),
+  );
+  if (!parsed.success) throw new AppError("INVALID_GUEST_OUTPUT", "Agent 发言未能生成，请重新拖入。", 502);
+  const known = new Set(sources.map((source) => source.id));
+  const cited = parsed.data.citations
+    .filter((id) => known.has(id))
+    .slice(0, 4);
+  const target = [...round.messages]
+    .reverse()
+    .find(
+      (message) =>
+        !GUEST_IDS.includes(message.speaker) &&
+        message.speaker !== "host" &&
+        message.phase !== "summary",
+    );
+  pushMessage(round, {
+    id: `${guest.id}-${randomUUID()}`,
+    speaker: guest.id,
+    phase: "exchange",
+    content: parsed.data.content.trim(),
+    summary: parsed.data.summary,
+    brief: parsed.data.brief,
+    replyTo: guest.id === "guest-counter" ? target?.id : undefined,
+    citations:
+      guest.id === "guest-counter"
+        ? []
+        : cited.length
+          ? cited
+          : sources.slice(0, 2).map((source) => source.id),
+  });
+
+  if (!round.roles.some((role) => role.id === id))
+    round.roles.push({ ...guest, sourceIds: sources.map((source) => source.id) });
+  round.joinedGuestIds = [...(round.joinedGuestIds ?? []), id];
+}

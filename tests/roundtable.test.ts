@@ -5,8 +5,8 @@ import {
   advanceRoundtable,
   createRoundtable,
   joinUser,
+  joinGuest,
   type ModelJson,
-  type Roundtable,
 } from "../src/lib/roundtable/engine";
 
 const sources: Source[] = [1, 2, 3, 4, 5, 6].map((id) => ({
@@ -84,13 +84,18 @@ test("statements batch into one call and dedupe speakers", async () => {
   assert.equal(round.messages.filter((m) => m.phase === "statement").length, 2);
 });
 
-test("guests interject between exchange pairs in order", async () => {
+test("only a manually joined guest speaks", async () => {
   const round = await bootstrap(fakeTurns);
   await advanceRoundtable(round, sources, fakeTurns); // statements
   await advanceRoundtable(round, sources, fakeTurns); // pair 1
   await advanceRoundtable(round, sources, fakeTurns); // pair 2
+  assert.equal(round.messages.some((m) => m.speaker.startsWith("guest-")), false);
+  await joinGuest(round, sources, fakeTurns, "guest-counter");
+  await joinGuest(round, sources, fakeTurns, "guest-counter");
+  assert.deepEqual(round.joinedGuestIds, ["guest-counter"]);
+  assert.equal(round.messages.filter((m) => m.speaker === "guest-counter").length, 1);
   const guest = round.messages.find((m) => m.speaker === "guest-counter");
-  assert.ok(guest, "counter guest should interject after two pairs");
+  assert.ok(guest, "counter guest should speak after being dropped");
   assert.equal(guest.replyTo, round.messages[round.messages.length - 2].id);
 });
 
@@ -117,9 +122,9 @@ test("summary only after enough viewpoint exchanges", async () => {
     (m) => m.phase === "exchange" && m.speaker.startsWith("role-"),
   ).length;
   assert.ok(viewpointExchanges >= 8);
-  // All three guests spoke exactly once.
+  // No library guest is invoked automatically.
   for (const guest of ["guest-counter", "guest-evidence", "guest-context"])
-    assert.equal(round.messages.filter((m) => m.speaker === guest).length, 1);
+    assert.equal(round.messages.filter((m) => m.speaker === guest).length, 0);
   // No further advance after completion.
   assert.equal(await advanceRoundtable(round, sources, fakeTurns), false);
 });
@@ -151,4 +156,78 @@ test("invalid citations fall back to the role's own sources", async () => {
   const statement = round.messages.find((m) => m.phase === "statement" && m.speaker === "role-1")!;
   // Citation 3 belongs to the rival base and must not survive.
   assert.deepEqual(statement.citations, [1, 2].slice(0, 2));
+});
+
+
+test("brief summaries survive generation without another model call", async () => {
+  let calls = 0;
+  const model: ModelJson = async (prompt, payload) => {
+    calls++;
+    const output = await fakeTurns(prompt, payload) as { opening?: { content: string; summary?: string }; turns?: { summary?: string }[] };
+    if (output.opening) output.opening.summary = "主持人摘要";
+    for (const turn of output.turns ?? []) turn.summary = "观点摘要";
+    return output;
+  };
+  const round = await bootstrap(model);
+  assert.equal(round.messages[0].summary, "主持人摘要");
+  await advanceRoundtable(round, sources, model);
+  assert.equal(calls, 2);
+  assert.equal(round.messages[1].summary, "观点摘要");
+  assert.equal(round.messages[1].content, "甲派陈述。");
+});
+
+test("invalid brief does not discard a valid full statement", async () => {
+  const round = await bootstrap(fakeTurns);
+  await advanceRoundtable(round, sources, async () => ({ turns: [
+    { speakerRoleId: "role-1", content: "完整观点", summary: "字".repeat(91), citations: [1] },
+  ] }));
+  assert.equal(round.messages.at(-1)?.content, "完整观点");
+  assert.equal(round.messages.at(-1)?.summary, undefined);
+});
+
+
+test("structured takeaway preserves claim and evidence alongside the full argument", async () => {
+  let calls = 0;
+  const brief = { claim: "读博应以研究兴趣为前提", evidence: "帖子1描述了长期科研投入带来的压力[1]" };
+  const model: ModelJson = async (prompt, payload) => {
+    calls++;
+    const output = await fakeTurns(prompt, payload) as { opening?: { brief?: typeof brief }; turns?: { brief?: typeof brief }[] };
+    if (output.opening) output.opening.brief = brief;
+    for (const turn of output.turns ?? []) turn.brief = brief;
+    return output;
+  };
+  const round = await bootstrap(model);
+  assert.deepEqual(round.messages[0].brief, brief);
+  await advanceRoundtable(round, sources, model);
+  assert.deepEqual(round.messages[1].brief, brief);
+  assert.equal(round.messages[1].content, "甲派陈述。");
+  assert.equal(calls, 2);
+});
+
+test("incomplete takeaway never masquerades as a supported viewpoint", async () => {
+  const round = await bootstrap(fakeTurns);
+  await advanceRoundtable(round, sources, async () => ({ turns: [
+    { speakerRoleId: "role-1", content: "完整论证", brief: { claim: "观点", evidence: " " }, citations: [1] },
+  ] }));
+  assert.equal(round.messages.at(-1)?.brief, undefined);
+  assert.equal(round.messages.at(-1)?.content, "完整论证");
+});
+
+test("each dropped guest speaks, including after completion, and unknown guests are rejected", async () => {
+  const round = await bootstrap(fakeTurns);
+  while (round.scheduler.state !== "complete") await advanceRoundtable(round, sources, fakeTurns);
+  for (const id of ["guest-evidence", "guest-context", "guest-counter"]) {
+    await joinGuest(round, sources, fakeTurns, id);
+    assert.equal(round.messages.at(-1)?.speaker, id);
+  }
+  assert.equal(round.scheduler.state, "complete");
+  await assert.rejects(joinGuest(round, sources, fakeTurns, "unknown"), { code: "INVALID_GUEST" });
+});
+
+test("failed guest generation does not mark it joined", async () => {
+  const round = await bootstrap(fakeTurns);
+  await assert.rejects(joinGuest(round, sources, async () => ({}), "guest-evidence"));
+  assert.deepEqual(round.joinedGuestIds, []);
+  await joinGuest(round, sources, fakeTurns, "guest-evidence");
+  assert.deepEqual(round.joinedGuestIds, ["guest-evidence"]);
 });

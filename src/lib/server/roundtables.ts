@@ -1,3 +1,4 @@
+import { summarizeMessages } from "../roundtable/brief";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { AppError } from "../domain/validation";
@@ -6,6 +7,7 @@ import {
   advanceRoundtable,
   createRoundtable,
   joinUser,
+  joinGuest,
   type ModelJson,
   type Roundtable,
 } from "../roundtable/engine";
@@ -165,4 +167,22 @@ export async function postMessage(
   await joinUser(round, round.sources, zhihuModel, content);
   save(round, token);
   return round;
+}
+
+export async function inviteGuest(id: string, token: string, guestId: string) {
+  const round = load(id, token);
+  await joinGuest(round, round.sources, zhihuModel, guestId);
+  save(round, token);
+  return round;
+}
+
+export async function completeBriefs(id: string, token: string, ids: string[]) {
+  const summaries = await summarizeMessages(load(id, token), ids, zhihuModel);
+  // Reload after the model call so concurrent discussion turns are preserved.
+  const latest = load(id, token);
+  for (const message of latest.messages) {
+    if (summaries[message.id]) message.summary = summaries[message.id];
+  }
+  save(latest, token);
+  return summaries;
 }
