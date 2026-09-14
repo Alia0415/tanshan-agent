@@ -581,8 +581,10 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
             className="side-user"
             onClick={() => setAbout(true)}
           >
-            <span className="side-avatar">访</span>
             <span className="side-user-name">访客</span>
+            <span className="side-mode">
+              {session?.provider === "live" ? "联网问答" : "体验模式"}
+            </span>
             <MoreHorizontal size={16} aria-hidden="true" />
           </button>
           <div className="privacy">
@@ -607,10 +609,6 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
             </nav>
           </div>
           <div className="topbar-right">
-            <span className="mode-badge">
-              <span />
-              {session?.provider === "live" ? "联网问答" : "体验模式"}
-            </span>
             <button
               type="button"
               className="mobile-new icon-button"
@@ -620,7 +618,6 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
             >
               <Plus size={20} />
             </button>
-            <span className="avatar">访</span>
           </div>
         </header>
         <div className="agent-main-scroll">
