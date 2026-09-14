@@ -25,6 +25,7 @@ type Post = {
 
 type MindMap = {
   thesis: string;
+  summary: string;
   branches: Array<{ label: string; points: string[] }>;
 };
 
@@ -107,6 +108,7 @@ export default function QuestionReader({ question }: { question: Question }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [mindMapReplay, setMindMapReplay] = useState(0);
   const [postMindMaps, setPostMindMaps] = useState<Record<string, MindMap>>({});
   const [mindMapLoadingIds, setMindMapLoadingIds] = useState<Set<string>>(new Set());
   const [mindMapErrors, setMindMapErrors] = useState<Record<string, string>>({});
@@ -191,7 +193,7 @@ export default function QuestionReader({ question }: { question: Question }) {
 
   async function continueClarifying() {
     if (!clarifyQuestion || !selectedAnswer) return;
-    const nextHistory = [...history, { prompt: clarifyQuestion.prompt, answer: selectedAnswer }];
+    const nextHistory = [...history.slice(0, questionIndex), { prompt: clarifyQuestion.prompt, answer: selectedAnswer }];
     setHistory(nextHistory);
     if (nextHistory.length >= 3) setStage("summary");
     else await loadClarifyingQuestion(nextHistory);
@@ -247,7 +249,7 @@ export default function QuestionReader({ question }: { question: Question }) {
             <span className="zhihu-mark">知</span>
             <span className="zhihu-word">知乎</span>
             <span className="brand-divider" />
-            <span className="wenshan-word">问山</span>
+            <span className="tanshan-word">探山</span>
           </Link>
           <Link className="back-home" href="/reading">← 返回首页，浏览更多问题</Link>
           <button className="quiet-button" type="button" disabled={isGenerating} onClick={resetSession}>重新开始阅读</button>
@@ -343,7 +345,7 @@ export default function QuestionReader({ question }: { question: Question }) {
                               setSelectedCategoryId(category.id);
                               setSelectedPost(null);
                               setFurthestStop((previous) => Math.max(previous, index));
-                              setFocusedCategoryId((current) => current === category.id ? "" : category.id);
+                              setFocusedCategoryId(category.id);
                             }}
                             aria-pressed={selected}
                             aria-expanded={focusedCategoryId === category.id}
@@ -451,23 +453,29 @@ export default function QuestionReader({ question }: { question: Question }) {
               <span className="demo-badge">知乎{selectedPost.contentType === "Article" ? "文章" : "回答"}</span>
               <BookmarkButton corner post={selectedPost} /><h2 id="post-title">{selectedPost.title}</h2>
               <p className="post-byline">{selectedPost.author}{selectedPost.authorBadge ? ` · ${selectedPost.authorBadge}` : ""} · {selectedPost.readTime} · {selectedPost.voteUpCount} 赞同 · {selectedPost.commentCount} 评论</p>
-              <section className="post-mind-map" aria-label="文章思维导图">
+              <section className="post-mind-map" aria-label="文章速读">
                 <div className="mind-map-heading">
-                  <div><span>30 秒看懂</span><h3>文章思维导图</h3></div>
-                  <small>基于知乎搜索摘要生成</small>
+                  <div><span>30 秒看懂</span><h3>文章速读</h3></div>
+                  {selectedMindMap && <button className="mind-map-replay" type="button" onClick={() => setMindMapReplay((value) => value + 1)}>重播动画</button>}
                 </div>
                 {selectedMindMap ? (
-                  <div className="mind-map-canvas">
-                    <div className="mind-map-center">
-                      <span>文章主旨</span>
-                      <strong>{selectedMindMap.thesis}</strong>
+                  <div className="reading-flow" key={selectedPostKey + mindMapReplay}>
+                    <div className="reading-flow-thesis">
+                      <span>一句话结论</span>
+                      <p>{selectedMindMap.thesis}</p>
                     </div>
-                    {selectedMindMap.branches.map((branch, index) => (
-                      <article className={"mind-map-branch branch-" + (index + 1)} key={branch.label + index}>
-                        <h4><span>{String(index + 1).padStart(2, "0")}</span>{branch.label}</h4>
-                        <ul>{branch.points.map((point) => <li key={point}>{point}</li>)}</ul>
-                      </article>
-                    ))}
+                    <ol className="reading-flow-steps">
+                      {selectedMindMap.branches.map((branch, index) => (
+                        <li className="reading-flow-step" style={{ "--step": index } as CSSProperties} key={branch.label + index}>
+                          <div className="reading-flow-marker" aria-hidden="true">{String(index + 1).padStart(2, "0")}</div>
+                          <article>
+                            <h4>{branch.label}</h4>
+                            <ul>{branch.points.map((point) => <li key={point}>{point}</li>)}</ul>
+                          </article>
+                        </li>
+                      ))}
+                    </ol>
+                    <small className="reading-flow-source">基于知乎搜索摘要生成 · 尚未获取全文</small>
                   </div>
                 ) : mindMapLoadingIds.has(selectedPostKey) ? (
                   <div className="mind-map-loading" role="status">
@@ -481,10 +489,17 @@ export default function QuestionReader({ question }: { question: Question }) {
                   </div>
                 )}
               </section>
-              <div className="post-takeaways">
-                <h3>读这篇时，可以留意</h3>
-                {selectedCategory.views.map((view, index) => <p key={view}><span>{index + 1}</span>{view}</p>)}
-              </div>
+              <section className="post-summary" aria-label="文章总结">
+                <h3>文章总结</h3>
+                <small>基于现有摘要，尚未获取全文</small>
+                {selectedMindMap ? (
+                  <p>{selectedMindMap.summary}</p>
+                ) : mindMapLoadingIds.has(selectedPostKey) ? (
+                  <p role="status">正在整理文章总结…</p>
+                ) : (
+                  <p>总结暂时无法生成，请点击上方“重新生成”重试。</p>
+                )}
+              </section>
             </div>
             <footer className="post-dialog-footer">
 
