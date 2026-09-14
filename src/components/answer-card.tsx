@@ -357,7 +357,6 @@ export function AnswerCard({
           open
           sourceTitle={resonance.source.title}
           sourceAuthor={resonance.source.author || "知乎作者"}
-          question={answer.focused_question}
           count={resonance.count}
           loading={resonance.loading}
           error={resonance.error}

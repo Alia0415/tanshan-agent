@@ -18,7 +18,6 @@ export type ResonanceGlobeOverlayProps = {
   open: boolean;
   sourceTitle: string;
   sourceAuthor: string;
-  question: string;
   count: number | null;
   loading: boolean;
   error: string;
@@ -29,7 +28,6 @@ export function ResonanceGlobeOverlay({
   open,
   sourceTitle,
   sourceAuthor,
-  question,
   count,
   loading,
   error,
@@ -113,7 +111,6 @@ export function ResonanceGlobeOverlay({
             ? "网络暂时没有回应，关闭后可以再次尝试"
             : "世界上，还有人也停在了这个问题前"}
         </p>
-        <blockquote title={question}>{question}</blockquote>
       </div>
 
       <div className={styles.visualStage}>
