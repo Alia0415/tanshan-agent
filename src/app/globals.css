@@ -2126,6 +2126,10 @@ summary {
 }
 
 /* Give each clarification a clear question, choice, and supplement hierarchy. */
+@media (min-width: 1121px) {
+  .conversation { width: min(1040px, 100%); }
+}
+
 .clarification-panel { padding: 28px; }
 .clarification-panel .panel-heading { gap: 10px; margin-bottom: 20px; }
 .clarification-panel .eyebrow { font-size: 12px; letter-spacing: 0.5px; color: #056de8; font-weight: 600; }
@@ -2213,6 +2217,9 @@ summary {
 }
 @media (min-width: 801px) {
   .agent-workspace .topbar { display: none; }
+}
+.agent-workspace .agent-main-scroll:has(.conversation) {
+  background: #f2f7ff;
 }
 .agent-main-scroll {
   min-height: 0;
