@@ -61,30 +61,35 @@ const examples = [
     icon: BriefcaseBusiness,
     category: "职业选择",
     text: "要不要从大公司去创业公司？",
+    lines: ["要不要从大公司", "去创业公司？"],
     hint: "把选择放回自己的处境",
   },
   {
     icon: Camera,
     category: "消费决策",
     text: "想买一台相机，应该怎么选？",
+    lines: ["想买一台相机，", "应该怎么选？"],
     hint: "先确认用途，再比较参数",
   },
   {
     icon: Leaf,
     category: "生活关系",
     text: "和室友作息不同，怎么办？",
+    lines: ["和室友作息不同，", "怎么办？"],
     hint: "听见经验，也梳理边界",
   },
   {
     icon: GraduationCap,
     category: "学业规划",
     text: "我真的适合读博吗？",
+    lines: ["我真的适合", "读博吗？"],
     hint: "兴趣、机会成本与长期目标",
   },
   {
     icon: Compass,
     category: "成长路径",
     text: "想转行进入 AI，现在开始晚吗？",
+    lines: ["想转行进入 AI，", "现在开始晚吗？"],
     hint: "从现实条件出发找到下一步",
   },
 ];
@@ -685,16 +690,12 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
               <span className={homeStyles.orbitTwo} aria-hidden="true" />
 
               <div className={homeStyles.hero}>
-                <p className={homeStyles.kicker}>
-                  <Sparkles size={14} aria-hidden="true" />
-                  知乎讨论 · 为你的处境重新组织
-                </p>
                 <h1 id="landing-title">
                   你好，<em>这里是问山。</em>
                 </h1>
                 <p className={homeStyles.lead}>多问一句，答案更近一步。</p>
                 <p className={homeStyles.supportingCopy}>
-                  从一个真实问题开始，让 Agent 先理解你的处境，再一起靠近答案。
+                  说说你的问题和处境，一起找到适合你的知乎经验。
                 </p>
               </div>
 
@@ -705,16 +706,6 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
 
                   return (
                     <div className={homeStyles.entryWrap} key={entry.href}>
-                      <span className={homeStyles.entryShot} aria-hidden="true">
-                        <Image
-                          className={homeStyles.entryShotImage}
-                          src={entry.image}
-                          alt=""
-                          width={448}
-                          height={entry.imageHeight}
-                          sizes="224px"
-                        />
-                      </span>
                       <span
                         className={homeStyles.entryBubble}
                         aria-hidden="true"
@@ -825,13 +816,13 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
               >
                 <div className={homeStyles.shelfHeading}>
                   <div>
-                    <span>QUESTION POSTS</span>
-                    <h2 id="question-shelf-title">从五个问题开始探索</h2>
+
+                    <h2 id="question-shelf-title">还没想好？试试这些问题</h2>
                   </div>
-                  <p>点击任意卡片，将问题放入上方对话框</p>
+
                 </div>
                 <div className={homeStyles.questionCards}>
-                  {examples.map((example, index) => {
+                  {examples.map((example) => {
                     const Icon = example.icon;
                     return (
                       <button
@@ -850,14 +841,12 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
                             <Icon size={16} aria-hidden="true" />
                             {example.category}
                           </span>
-                          <span className={homeStyles.cardIndex}>
-                            {String(index + 1).padStart(2, "0")}
-                          </span>
+
                         </span>
-                        <strong>{example.text}</strong>
+                        <strong>{example.lines[0]}<br />{example.lines[1]}</strong>
                         <small>{example.hint}</small>
                         <span className={homeStyles.cardAction}>
-                          带给问山
+
                           <ArrowRight size={15} aria-hidden="true" />
                         </span>
                       </button>
@@ -1166,10 +1155,6 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
             </>
           )}
           </main>
-          <footer className="page-footer">
-            <span>多问一句，答案更近一步。</span>
-            <span>匿名会话保留 24 小时</span>
-          </footer>
         </div>
       </div>
       {showClarificationProgress && (
