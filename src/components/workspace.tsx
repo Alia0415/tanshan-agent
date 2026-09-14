@@ -903,7 +903,17 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
             <>
               <div className="user-message">
                 <span className="user-label">你的问题</span>
-                <h1>{session.original_question}</h1>
+                <div className="question-roundtable-row">
+                  <h1>{session.original_question}</h1>
+                  <Link
+                    className="question-roundtable-link"
+                    href={{ pathname: "/roundtable", query: { q: session.original_question } }}
+                  >
+                    <MessagesSquare size={16} aria-hidden="true" />
+                    带到圆桌讨论
+                    <ArrowRight size={14} aria-hidden="true" />
+                  </Link>
+                </div>
               </div>
               {session.provider === "demo" && (
                 <div className="demo-note">

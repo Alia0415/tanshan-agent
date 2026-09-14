@@ -1,13 +1,8 @@
 'use client';
-import { type DragEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { createPortal } from 'react-dom';
+import { type DragEvent, useEffect, useMemo, useRef, useState } from 'react';
+
 import type { Roundtable } from '@/lib/roundtable/engine';
 import './room-stage.css';
-
-const emptySubscribe = () => () => {};
-function readMounted() {
-  return true;
-}
 
 export const TURN_MS = 16000;
 const seats = [
@@ -438,17 +433,34 @@ export function RoomStage({
     if (elapsed < 14300) return '返回沙发';
     return '坐下';
   };
-  // 场景设置与 Agent 库整体传送进聊天框（#chat-controls-slot）；
-  // 挂载后才启用 Portal，避免服务端/客户端水合不一致报错
-  const mounted = useSyncExternalStore(emptySubscribe, readMounted, () => false);
-  const controlsSlot =
-    !mounted || typeof document === 'undefined'
-      ? null
-      : document.getElementById('chat-controls-slot');
-  const controls = (
-    <div className="room-controls chat-controls">
-      <div className="room-control-bar">
-        <div className="room-control-tabs">
+  return (
+    <section className="room-experience" aria-label="可视化圆桌">
+
+      <div
+        ref={worldRef}
+        className={'room-world room-' + scene}
+        onDragOver={(event) => {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = 'copy';
+        }}
+        onDrop={dropAgent}
+        onPointerUp={(event) => {
+          if (draggingAgent)
+            finishAgentDrag(draggingAgent, event.clientX, event.clientY);
+        }}
+      >
+        <div
+          className="room-controls room-theme-controls"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              setSettingsOpen(false);
+              event.currentTarget.querySelector('button')?.focus();
+            }
+          }}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) setSettingsOpen(false);
+          }}
+        >
           <button
             type="button"
             onClick={() => {
@@ -458,7 +470,7 @@ export function RoomStage({
             aria-expanded={settingsOpen}
             aria-controls="room-settings"
           >
-            场景设置
+            主题
           </button>
           <button
             type="button"
@@ -471,30 +483,6 @@ export function RoomStage({
           >
             Agent 库{presentGuests.length > 0 && <b>{presentGuests.length}</b>}
           </button>
-        </div>
-        <span>{!round.messages.length ? '等待发起' : playing ? '圆桌进行中' : '已暂停'}</span>
-      </div>
-      {settingsOpen && (
-        <div id="room-settings">
-          {[
-            ['morning', '晨光共创室'],
-            ['strategy', '黄昏作战室'],
-            ['night', '夜间研究室'],
-          ].map(([id, name]) => (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={scene === id}
-              onClick={() => onScene(id)}
-            >
-              {name}
-            </button>
-          ))}
-          <button type="button" onClick={() => onScene(null)}>
-            跟随讨论进度
-          </button>
-        </div>
-      )}
       {libraryOpen && (
         <div id="agent-library" className="agent-library">
           {agentLibrary.map((agent) => {
@@ -528,24 +516,28 @@ export function RoomStage({
           })}
         </div>
       )}
-    </div>
-  );
-  return (
-    <section className="room-experience" aria-label="可视化圆桌">
-      {controlsSlot && createPortal(controls, controlsSlot)}
-      <div
-        ref={worldRef}
-        className={'room-world room-' + scene}
-        onDragOver={(event) => {
-          event.preventDefault();
-          event.dataTransfer.dropEffect = 'copy';
-        }}
-        onDrop={dropAgent}
-        onPointerUp={(event) => {
-          if (draggingAgent)
-            finishAgentDrag(draggingAgent, event.clientX, event.clientY);
-        }}
-      >
+      {settingsOpen && (
+        <div id="room-settings">
+          {[
+            ['morning', '晨光共创室'],
+            ['strategy', '黄昏作战室'],
+            ['night', '夜间研究室'],
+          ].map(([id, name]) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={scene === id}
+              onClick={() => onScene(id)}
+            >
+              {name}
+            </button>
+          ))}
+          <button type="button" onClick={() => onScene(null)}>
+            跟随讨论进度
+          </button>
+        </div>
+      )}
+        </div>
         {['morning', 'strategy', 'night'].map((s) => (
           <div
             key={s}

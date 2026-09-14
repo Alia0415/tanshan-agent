@@ -185,11 +185,13 @@ export function WeChatIntro({
   question,
   setQuestion,
   busy,
+  error,
   onStart,
 }: {
   question: string;
   setQuestion: (value: string) => void;
   busy: string;
+  error: string;
   onStart: () => void;
 }) {
   return (
@@ -220,6 +222,7 @@ export function WeChatIntro({
           {busy ? <LoaderCircle size={16} className="spin" /> : "组局"}
         </button>
         {busy && <div className="wechat-typing">正在检索并组建圆桌…</div>}
+        {error && <p className="wechat-error" role="alert">{error}</p>}
       </div>
     </div>
   );
