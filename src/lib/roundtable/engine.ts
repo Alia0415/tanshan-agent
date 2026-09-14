@@ -31,10 +31,18 @@ export interface RoundMessage {
   phase: RoundPhase;
   content: string;
   summary?: string;
-  brief?: { topic?: string; claim: string; evidence: string };
+  evidencePoints?: string[];
+  brief?: { topic?: string; claim: string; evidence: string; evidencePoints?: string[] };
   replyTo?: string;
   citations: number[];
   order: number;
+}
+export interface DiscussionIssue {
+  id: string;
+  question: string;
+  state: "open" | "resolved" | "needs_evidence" | "stalled";
+  attempts: number;
+  reason?: string;
 }
 export interface Roundtable {
   id: string;
@@ -47,6 +55,7 @@ export interface Roundtable {
   // only their ids appear in citations.
   sources: Source[];
   joinedGuestIds?: string[];
+  issues?: DiscussionIssue[];
   roles: RoundRole[];
   messages: RoundMessage[];
   commonGround: string[];
@@ -59,6 +68,7 @@ const briefSchema = z.object({
   topic: z.string().trim().min(1).max(200).optional().catch(undefined),
   claim: z.string().trim().min(1).max(40),
   evidence: z.string().trim().min(1).max(60),
+  evidencePoints: z.array(z.string().trim().min(1).max(60)).min(1).max(5).optional().catch(undefined),
 }).optional().catch(undefined);
 
 const EXCHANGES_PER_ROLE = 2;
@@ -113,12 +123,13 @@ function citationsOf(
 // Never trust model-written evidence text: once the ID validates, the visible
 // excerpt comes from the stored source, so only IDs are kept.
 function validCitations(value: unknown, role: RoundRole, sources: Source[]) {
-  const direct = citationsOf(value, role.sourceIds, sources);
-  return direct.length ? direct : role.sourceIds.slice(0, 2);
+  return citationsOf(value, role.sourceIds, sources);
 }
 function schedulerInput(question: string, sources: Source[], round: Roundtable, candidates: string[]) {
   return {
     question,
+    activeIssue: round.issues?.find((issue) => issue.state === "open"),
+    issues: round.issues,
     // Viewpoint sources already live in each candidate knowledge base.
     sources: (candidates.length ? [] : sources).map(({ id, title, excerpt, author, url }) => ({
       id,
@@ -152,7 +163,20 @@ function pushMessage(
   round: Roundtable,
   message: Omit<RoundMessage, "order">,
 ): RoundMessage {
-  const full = { ...message, order: round.messages.length };
+  const clean = (value: string) => message.speaker === "user" ? value : value.replace(/\[(\d+)\]/g, (match, id: string) =>
+    message.citations.includes(Number(id)) ? match : "");
+  const full: RoundMessage = {
+    ...message,
+    content: clean(message.content),
+    summary: message.summary && clean(message.summary),
+    brief: message.brief && {
+      ...message.brief,
+      claim: clean(message.brief.claim),
+      evidence: clean(message.brief.evidence),
+      ...(message.brief.evidencePoints ? { evidencePoints: message.brief.evidencePoints.map(clean) } : {}),
+    },
+    order: round.messages.length,
+  };
   round.messages.push(full);
   round.scheduler = {
     state: round.scheduler?.state === "complete" ? "complete" : "running",
@@ -187,7 +211,7 @@ function appendTurn(
   const content = text(turn.content, 2000);
   if (!content) return;
   let replyTo = text(turn.replyToMessageId, 80);
-  if (firstTurnId && replyTo === "first-turn") replyTo = firstTurnId;
+  if (firstTurnId) replyTo = firstTurnId;
   if (phase === "statement") replyTo = undefined;
   else {
     const target = round.messages.find((message) => message.id === replyTo);
@@ -219,6 +243,7 @@ export async function createRoundtable(
   model_name: string | null,
 ): Promise<Roundtable> {
   const rosterSchema = z.object({
+    issues: z.array(z.string().trim().min(1).max(200)).min(1).max(3).optional(),
     opening: z.object({
       content: z.string().min(1).max(1200),
       summary: z.string().trim().min(1).max(90).optional().catch(undefined),
@@ -294,6 +319,9 @@ export async function createRoundtable(
       ...roles,
     ],
     joinedGuestIds: [],
+    issues: (parsed.data.issues ?? [question]).map((question, index) => ({
+      id: `issue-${index + 1}`, question, state: "open", attempts: 0,
+    })),
     messages: [],
     commonGround: [],
     disagreements: [],
@@ -363,7 +391,7 @@ export async function advanceRoundtable(
     viewpoints.length * EXCHANGES_PER_ROLE,
   );
   if (
-    viewpointExchanges.length >= summaryExchanges ||
+    (round.issues?.length ? round.issues.every((issue) => issue.state !== "open") : viewpointExchanges.length >= summaryExchanges) ||
     round.messages.length >= MAX_MESSAGES
   ) {
     const schema = z.object({
@@ -379,6 +407,7 @@ export async function advanceRoundtable(
         question: round.question,
         sources,
         transcript: round.messages,
+        issues: round.issues,
       }),
     );
     const known = new Set(sources.map((source) => source.id));
@@ -430,7 +459,7 @@ export async function advanceRoundtable(
       sources,
       turn,
       "exchange",
-      candidateIds,
+      candidateIds.filter((id) => !speakers.includes(id)),
       firstId,
     );
     if (message) {
@@ -444,6 +473,24 @@ export async function advanceRoundtable(
       "本轮交锋未能生成，请重试。",
       502,
     );
+  const issue = round.issues?.find((item) => item.state === "open");
+  if (issue) {
+    issue.attempts++;
+    const progress = z.object({
+      issueId: z.string(),
+      state: z.enum(["open", "resolved", "needs_evidence", "stalled"]),
+      reason: z.string().trim().min(1).max(240),
+    }).safeParse((output as { progress?: unknown } | null)?.progress);
+    // A partial pair cannot claim a resolved debate.
+    if (speakers.length === 2 && progress.success && progress.data.issueId === issue.id) {
+      issue.state = progress.data.state;
+      issue.reason = progress.data.reason;
+    }
+    if (issue.state === "open" && issue.attempts >= 2) {
+      issue.state = "stalled";
+      issue.reason = "已讨论两轮，仍未形成明确结论，保留分歧。";
+    }
+  }
   return true;
 }
 
@@ -521,9 +568,7 @@ export async function joinGuest(round: Roundtable, sources: Source[], model: Mod
     citations:
       guest.id === "guest-counter"
         ? []
-        : cited.length
-          ? cited
-          : sources.slice(0, 2).map((source) => source.id),
+        : cited,
   });
 
   if (!round.roles.some((role) => role.id === id))
