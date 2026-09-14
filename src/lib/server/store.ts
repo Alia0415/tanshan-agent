@@ -1,3 +1,4 @@
+import { isZhihuPost } from "../domain/sources";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -104,7 +105,7 @@ export function listSessions(token: string): SessionSummary[] {
   const rows = db().prepare("SELECT data FROM sessions WHERE owner = ? AND expires > ?")
     .all(ownerHash(token), Date.now()) as { data: string }[];
   return rows.map((row) => JSON.parse(row.data) as Session)
-    .filter((session) => session.schema_version === 2)
+    .filter((session) => session.schema_version === 2 && session.answers.some((answer) => answer.sources.some(isZhihuPost)))
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .map(({ session_id, original_question, stage, created_at }) => ({
       session_id, original_question, stage, created_at,
@@ -163,4 +164,11 @@ export function transaction<T>(operation: () => T): T {
     connection.exec("ROLLBACK");
     throw error;
   }
+}
+
+export function deleteSession(id: string, token: string) {
+  const result = db().prepare("DELETE FROM sessions WHERE id = ? AND owner = ?")
+    .run(id, ownerHash(token));
+  if (!result.changes)
+    throw new AppError("SESSION_NOT_FOUND", "记录已删除或无法访问。", 404);
 }

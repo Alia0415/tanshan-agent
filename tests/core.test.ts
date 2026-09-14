@@ -24,7 +24,7 @@ import {
   updateContext,
   addFeedback,
 } from "../src/lib/server/sessions";
-import { getSession, db, cleanup, listSessions, insertSession } from "../src/lib/server/store";
+import { getSession, db, cleanup, listSessions, insertSession, deleteSession } from "../src/lib/server/store";
 import {
   deduplicate,
   parseDraft,
@@ -32,7 +32,7 @@ import {
   type Draft,
   type KnowledgeProvider,
 } from "../src/lib/server/providers";
-import type { Source } from "../src/lib/domain/types";
+import type { Answer, Source } from "../src/lib/domain/types";
 import { isZhihuPostUrl } from "../src/lib/domain/sources";
 
 process.env.WENSHAN_DB_PATH = join(
@@ -67,15 +67,30 @@ const start = async (question = "远程办公的实际体验怎么样？") =>
 
 test("history isolates owners, omits expired sessions and returns newest summaries first", async () => {
   const token = randomUUID();
-  const base = await start();
+  const initial = await start();
+  const answer: Answer = {
+    ...draft, id: randomUUID(), context_version: initial.context_version,
+    context: initial.confirmed_context, focused_question: initial.focused_question,
+    sources: [source], queries: [], evidence: "sources", created_at: initial.created_at,
+  };
+  const base = { ...initial, stage: "completed" as const, answers: [answer] };
   const earlier = { ...base, session_id: randomUUID(), created_at: new Date(Date.now() - 10000).toISOString() };
   const newer = { ...base, session_id: randomUUID(), created_at: new Date().toISOString() };
   insertSession(earlier, token);
   insertSession(newer, token);
   insertSession({ ...base, session_id: randomUUID(), expires_at: new Date(Date.now() - 1).toISOString() }, token);
+  // Abandoned drafts and completed searches without posts are not history.
+  const unfinished = { ...initial, session_id: randomUUID() };
+  insertSession(unfinished, token);
+  insertSession({ ...base, session_id: randomUUID(), answers: [{ ...answer, sources: [] }] }, token);
+  insertSession({ ...base, session_id: randomUUID(), answers: [{ ...answer, sources: [{ ...source, url: "https://example.com/post" }] }] }, token);
+  // Editing conditions after a successful search must not lose that history.
+  const edited = { ...base, session_id: randomUUID(), stage: "ready" as const, context_version: 2, created_at: new Date(Date.now() - 20000).toISOString() };
+  insertSession(edited, token);
   const history = listSessions(token);
-  assert.deepEqual(history.map((item) => item.session_id), [newer.session_id, earlier.session_id]);
+  assert.deepEqual(history.map((item) => item.session_id), [newer.session_id, earlier.session_id, edited.session_id]);
   assert.equal("answers" in history[0], false);
+  assert.equal(getSession(unfinished.session_id, token).session_id, unfinished.session_id);
   assert.deepEqual(listSessions(randomUUID()), []);
   assert.equal(getSession(newer.session_id, token).original_question, base.original_question);
   assert.throws(() => getSession(newer.session_id, "different-owner"), AppError);
@@ -761,4 +776,19 @@ test("generation quota errors retain actual sources and never retry generation",
   assert.equal(result.stage, "completed");
   assert.equal(result.answers[0].format, "source_excerpts");
   assert.match(result.answers[0].limitations.join(""), /额度或频率受限/);
+});
+
+test("deleting history enforces ownership and removes related data only for that session", async () => {
+  const session = await start();
+  const other = await start();
+  db().prepare("INSERT INTO requests VALUES (?, ?, ?, ?)").run(session.session_id, "delete-test", 1, "completed");
+  db().prepare("INSERT INTO feedback VALUES (?, ?, ?, ?)").run(session.session_id, "answer-test", "helpful", null);
+  assert.throws(() => deleteSession(session.session_id, "another-owner"), AppError);
+  assert.equal(getSession(session.session_id, owner).session_id, session.session_id);
+  deleteSession(session.session_id, owner);
+  assert.throws(() => getSession(session.session_id, owner), AppError);
+  assert.equal(db().prepare("SELECT * FROM requests WHERE session_id = ?").get(session.session_id), undefined);
+  assert.equal(db().prepare("SELECT * FROM feedback WHERE session_id = ?").get(session.session_id), undefined);
+  assert.equal(getSession(other.session_id, owner).session_id, other.session_id);
+  assert.throws(() => deleteSession(session.session_id, owner), AppError);
 });

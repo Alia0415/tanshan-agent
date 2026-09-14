@@ -94,7 +94,7 @@ test("question and selected answer retain their meaning in the planner, search a
   const result = await clarify(first.session_id, owner, {
     context_version: 1, selections: {}, answer: "旅行风景", free_text: "主要徒步，不拍视频", skip: false,
   }, async (session) => { observed = structuredClone(session); return undefined; });
-  assert.deepEqual(observed?.clarification_history, [{ question: first.clarification!.title, answer: "旅行风景；主要徒步，不拍视频" }]);
+  assert.deepEqual(observed?.clarification_history?.map(({ question, answer }) => ({ question, answer })), [{ question: first.clarification!.title, answer: "旅行风景；主要徒步，不拍视频" }]);
   assert.equal(result.auto_answer, true);
   assert.match(result.session.focused_question, /你主要用相机拍什么.*旅行风景/u);
   assert.ok(buildQueries(result.session).every((query) => query.includes("主要徒步")));
@@ -243,4 +243,68 @@ test("text conversation exposes and resolves dynamically generated option number
   assert.equal(second.stage, "completed");
   assert.match(getSession(first.session_id, owner).focused_question, /旅行风景/);
   assert.equal(calls, 2);
+});
+
+
+test("editing a saved choice replaces search inputs and produces a new answer while preserving the old snapshot", async () => {
+  const { session: first } = await initial();
+  let { session } = await clarify(first.session_id, owner, {
+    context_version: 1, selections: {}, answer: ["旅行风景"], free_text: "轻便优先", skip: false,
+  }, async () => undefined);
+  const calls: string[] = [];
+  const provider = {
+    search: async (query: string) => {
+      calls.push(query);
+      return [{ id: 1, content_id: "test", title: "测试帖子", author: "测试作者", type: "answer", url: "https://www.zhihu.com/question/1/answer/2", excerpt: "测试摘录" }];
+    },
+    generate: async () => ({ summary: "测试摘要", summary_citations: [1], sections: [], limitations: [] }),
+  };
+  const run = async () => {
+    const request = randomUUID();
+    claimAnswer(session.session_id, owner, session.context_version, request);
+    await runAnswer(session.session_id, session.context_version, request, provider);
+    session = getSession(session.session_id, owner);
+  };
+  await run();
+  const oldAnswer = structuredClone(session.answers[0]);
+  assert.deepEqual(oldAnswer.clarification_history?.[0].card?.options, ["旅行风景", "人像日常"]);
+  calls.length = 0;
+  const version = session.context_version;
+  session = updateContext(session.session_id, owner, {
+    context_version: version, changes: {},
+    clarification_revision: { history_index: 0, selected: ["人像日常"], free_text: "室内拍摄" },
+  }).session;
+  assert.equal(session.stage, "ready");
+  assert.equal(session.context_version, version + 1);
+  assert.equal(session.clarification_history?.[0].answer, "人像日常；室内拍摄");
+  assert.ok(!session.focused_question.includes("旅行风景"));
+  assert.ok(!session.focused_question.includes("轻便优先"));
+  assert.throws(() => updateContext(session.session_id, owner, {
+    context_version: version, changes: {},
+    clarification_revision: { history_index: 0, selected: ["旅行风景"] },
+  }), AppError);
+  await run();
+  assert.ok(calls.length > 0, "must make new search calls");
+  assert.ok(calls.every((query) => query.includes("人像日常") && query.includes("室内拍摄") && !query.includes("旅行风景")));
+  assert.equal(session.answers.length, 2);
+  assert.deepEqual(session.answers[0], oldAnswer);
+  assert.equal(session.answers[1].clarification_history?.[0].answer, "人像日常；室内拍摄");
+  assert.equal(session.stage, "completed");
+});
+
+test("choice revisions reject unknown options, missing questions and empty answers without changing state", async () => {
+  const { session: first } = await initial();
+  const { session } = await clarify(first.session_id, owner, {
+    context_version: 1, selections: {}, answer: "旅行风景", skip: false,
+  }, async () => undefined);
+  for (const revision of [
+    { history_index: 0, selected: ["不存在的选项"] },
+    { history_index: 99, selected: ["旅行风景"] },
+    { history_index: 0, selected: [] },
+  ]) {
+    assert.throws(() => updateContext(session.session_id, owner, {
+      context_version: session.context_version, changes: {}, clarification_revision: revision,
+    }), AppError);
+    assert.deepEqual(getSession(session.session_id, owner), JSON.parse(JSON.stringify(session)));
+  }
 });

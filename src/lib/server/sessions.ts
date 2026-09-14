@@ -15,6 +15,7 @@ import {
 } from "../domain/clarification";
 import { planClarification, type ClarificationPlanner } from "./clarification-planner";
 import { retrieve } from "./retrieval";
+import { fallbackConditionTags } from "../domain/condition-tags";
 import {
   checkVersion,
   db,
@@ -126,7 +127,9 @@ export async function clarify(
       // Keep the question with its answer so a short choice retains its meaning downstream.
       supplement(session, `关于「${previousCard.title}」：${answer}`, answer);
       session.clarification_history = [...(session.clarification_history || []),
-        { question: previousCard.title, answer }];
+        { question: previousCard.title, answer, card: structuredClone(previousCard),
+          selected: answers, free_text: input.free_text || "",
+          supplement_index: session.free_text_context.length - 1 }];
     }
   } else {
     supplement(session, input.free_text);
@@ -175,6 +178,36 @@ export function updateContext(
       session.confirmed_context,
       input.changes,
     );
+    if (input.clarification_revision) {
+      const revision = input.clarification_revision;
+      const turn = session.clarification_history?.[revision.history_index];
+      if (!turn) throw new AppError("INVALID_SELECTION", "找不到对应追问，请刷新后重试。");
+      if (revision.selected.length && (!turn.card?.options ||
+        revision.selected.some((option) => !turn.card!.options!.includes(option)) ||
+        (turn.card.selection_mode !== "multiple" && revision.selected.length > 1)))
+        throw new AppError("INVALID_SELECTION", "请选择原追问提供的选项。");
+      const answer = [...revision.selected, revision.free_text?.trim()].filter(Boolean).join("；");
+      if (!answer) throw new AppError("EMPTY_SELECTION", "请选择至少一项或填写补充内容。");
+      const oldSupplement = "关于「" + turn.question + "」：" + turn.answer;
+      const index = turn.supplement_index ?? session.free_text_context.indexOf(oldSupplement);
+      if (index < 0 || session.free_text_context[index] !== oldSupplement)
+        throw new AppError("INVALID_SELECTION", "这条历史追问缺少可修改记录，请使用修改本次条件。");
+      const replacement = "关于「" + turn.question + "」：" + answer;
+      if (session.free_text_context.join("").length - oldSupplement.length + replacement.length > 16000)
+        throw new AppError("CONTEXT_LIMIT", "补充内容过长，请精简后重试。");
+      session.free_text_context[index] = replacement;
+      const oldDerived = extractContext(turn.answer);
+      const otherText = [session.original_question, ...session.free_text_context.filter((_, i) => i !== index)].join("；");
+      const otherDerived = extractContext(otherText);
+      if (oldDerived.priorities) session.confirmed_context.priorities = session.confirmed_context.priorities.filter(
+        (priority) => !oldDerived.priorities!.includes(priority) || otherDerived.priorities?.includes(priority));
+      if (oldDerived.purpose && session.confirmed_context.purpose === oldDerived.purpose)
+        session.confirmed_context.purpose = otherDerived.purpose || undefined;
+      session.confirmed_context = mergeContext(session.confirmed_context, extractContext(answer));
+      turn.answer = answer;
+      turn.selected = [...revision.selected];
+      turn.free_text = revision.free_text?.trim() || "";
+    }
     supplement(session, input.free_text);
     session.context_version += 1;
     session.stage = "ready";
@@ -268,6 +301,8 @@ export async function runAnswer(
     if (!session) return;
     let queries = buildQueries(session);
     let searchInfo;
+    let conditionTags = fallbackConditionTags(session);
+    let conditionSources: { label: string; history_index: number }[] = [];
     const warnings: string[] = [];
     let sources: Awaited<ReturnType<KnowledgeProvider["search"]>> = [];
     if (session.provider === "live") {
@@ -276,6 +311,8 @@ export async function runAnswer(
       queries = result.queries;
       warnings.push(...result.warnings);
       searchInfo = result.info;
+      if (result.conditionTags.length) conditionTags = result.conditionTags;
+      conditionSources = result.conditionSources;
     } else {
       await new Promise((resolve) => setTimeout(resolve, 450));
     }
@@ -308,6 +345,9 @@ export async function runAnswer(
       id: randomUUID(),
       context_version: version,
       context: structuredClone(session.confirmed_context),
+      condition_tags: conditionTags,
+      condition_sources: conditionSources,
+      clarification_history: structuredClone(session.clarification_history || []),
       focused_question: session.focused_question,
       sources,
       queries,
