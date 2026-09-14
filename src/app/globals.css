@@ -2821,3 +2821,5 @@ dialog.delete-dialog { position: fixed; inset: 0; margin: auto; width: 470px; ma
 .delete-cancel { border: 1px solid #dce5f0; border-radius: 10px; background: #fff; color: #526580; cursor: pointer; }
 .delete-cancel:hover { background: #f0f6ff; }
 .delete-dialog button:focus-visible { outline: 2px solid #056de8; outline-offset: 3px; }
+.bookmark-post-card { position: relative; }
+.bookmark-post-card .source-card strong { display: block; padding-right: 100px; }

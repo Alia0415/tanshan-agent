@@ -1044,3 +1044,6 @@ a:focus-visible {
   .moon-line { font-size: 16px; }
   .moon-line.current { font-size: 19px; }
 }
+.ordinary-answer, .post-dialog-body { position: relative; }
+.ordinary-answer > strong { display: block; padding-right: 100px; }
+.post-dialog-body h2 { padding-right: 100px; }

@@ -362,7 +362,7 @@ export default function QuestionReader({ question }: { question: Question }) {
             <section className="answer-preview" aria-label="普通回答列表预览">
               <div className="answer-toolbar"><strong>这个问题下的回答</strong><span>摘要</span></div>
               {ordinaryLoading ? <p className="feed-notice" role="status">正在加载回答摘要…</p> : ordinaryError ? <p className="feed-notice" role="alert">{ordinaryError}</p> : ordinary.length === 0 ? <p className="feed-notice">暂未检索到这个问题的回答摘要，可前往知乎阅读。</p> :
-                ordinary.map(item => <article className="ordinary-answer" key={item.url}><strong>{item.author}</strong><p>{item.excerpt}</p><div><span>{item.votes} 赞同</span><a href={item.url} target="_blank" rel="noreferrer">阅读完整回答</a><BookmarkButton post={{ url: item.url, title: question.title, author: item.author, excerpt: item.excerpt }} /></div></article>)}
+                ordinary.map(item => <article className="ordinary-answer" key={item.url}><strong>{item.author}</strong><p>{item.excerpt}</p><div><span>{item.votes} 赞同</span><a href={item.url} target="_blank" rel="noreferrer">阅读完整回答</a><BookmarkButton corner post={{ url: item.url, title: question.title, author: item.author, excerpt: item.excerpt }} /></div></article>)}
               <a className="all-answers" href={question.url} target="_blank" rel="noreferrer">前往知乎查看全部回答</a>
             </section>
           )}
@@ -380,7 +380,7 @@ export default function QuestionReader({ question }: { question: Question }) {
             </header>
             <div className="post-dialog-body">
               <span className="demo-badge">知乎{selectedPost.contentType === "Article" ? "文章" : "回答"}</span>
-              <h2 id="post-title">{selectedPost.title}</h2>
+              <BookmarkButton corner post={selectedPost} /><h2 id="post-title">{selectedPost.title}</h2>
               <p className="post-byline">{selectedPost.author}{selectedPost.authorBadge ? ` · ${selectedPost.authorBadge}` : ""} · {selectedPost.readTime} · {selectedPost.voteUpCount} 赞同 · {selectedPost.commentCount} 评论</p>
               <p className="post-lead">{selectedPost.excerpt}</p>
               <div className="post-context">
@@ -394,7 +394,7 @@ export default function QuestionReader({ question }: { question: Question }) {
             </div>
             <footer className="post-dialog-footer">
 
-              <a href={selectedPost.url} target="_blank" rel="noreferrer">打开知乎原文 ↗</a><BookmarkButton post={selectedPost} />
+              <a href={selectedPost.url} target="_blank" rel="noreferrer">打开知乎原文 ↗</a>
             </footer>
           </article>
         </div>

@@ -16,3 +16,31 @@
 .post h3 { margin: 0 0 8px; font-size: 18px; }
 .post p { color: #66746c; line-height: 1.8; white-space: pre-wrap; }
 .post .button + .button { margin-left: 8px; }
+.corner { position: absolute; top: 14px; right: 14px; z-index: 1; color: #056de8; border-color: #e1edff; }
+.post { position: relative; }
+.post h3 { padding-right: 100px; }
+.library { position: fixed; inset: 0; margin: auto; width: min(900px, calc(100vw - 32px)); max-height: 85dvh; padding: 0; overflow: auto; border: 1px solid #e1edff; border-radius: 18px; background: #fff; color: #243d32; }
+.library::backdrop { background: #1f3b6144; backdrop-filter: blur(3px); }
+.library .page { margin: 0; padding: 32px 28px; }
+.library .page h1 { padding-right: 70px; }
+.close { position: absolute; top: 24px; right: 24px; }
+.folderList, .linkList { list-style: none; padding: 0; margin: 24px 0 0; }
+.folderList li + li, .linkList li + li { border-top: 1px solid #edf0ef; }
+.folderName { display: block; width: 100%; padding: 18px 12px; text-align: left; border: 0; border-radius: 8px; background: transparent; color: inherit; font: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.folderName:hover, .linkList a:hover { background: #f5f9ff; }
+.linkList a { display: block; padding: 18px 12px; border-radius: 8px; text-decoration: none; }
+.linkTitle { display: block; color: #315d50; font-size: 16px; line-height: 1.6; overflow-wrap: anywhere; }
+.linkUrl { display: block; margin-top: 6px; color: #7b8983; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.back { padding: 0; margin: 0 0 18px; border: 0; background: transparent; color: #64756e; font: inherit; font-size: 14px; cursor: pointer; }
+.folderName:focus-visible, .linkList a:focus-visible, .back:focus-visible { outline: 2px solid #056de8; outline-offset: 3px; }
+.library .page h1 { overflow-wrap: anywhere; }
+.folderName { display: flex; align-items: center; gap: 12px; }
+.folderName > span { flex: 1; min-width: 0; }
+.folderIcon { color: #7e9d92; fill: #eff5f1; flex-shrink: 0; }
+.rowArrow { color: #a1afa8; flex-shrink: 0; }
+.linkTitle { display: flex; align-items: baseline; gap: 10px; }
+.linkTitle > svg { color: #8a9e95; flex-shrink: 0; }
+.linkUrl { display: flex; align-items: baseline; gap: 7px; }
+.linkUrl > svg { flex-shrink: 0; }
+.linkUrl > span { min-width: 0; }
+.back { display: inline-flex; align-items: center; gap: 6px; }
