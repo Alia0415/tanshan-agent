@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowRight,
   ArrowUp,
@@ -18,6 +18,8 @@ import {
   MessagesSquare,
   MoreHorizontal,
   Mountain,
+  PanelLeftClose,
+  PanelLeftOpen,
   PencilLine,
   Plus,
   RotateCcw,
@@ -143,6 +145,7 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
   const [editing, setEditing] = useState(false);
   const [about, setAbout] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [history, setHistory] = useState<SessionSummary[]>([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [connectionLost, setConnectionLost] = useState(false);
@@ -508,9 +511,20 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
 
   return (
     <div
-      className={`app-shell agent-workspace${isLanding ? ` ${homeStyles.landingMode}` : ""}${showClarificationProgress ? " has-clarification-progress" : ""}`}
+      className={`app-shell agent-workspace${sidebarCollapsed ? " sidebar-collapsed" : ""}${isLanding ? ` ${homeStyles.landingMode}` : ""}${showClarificationProgress ? " has-clarification-progress" : ""}`}
     >
-      <aside className="sidebar">
+      <button
+        type="button"
+        className="sidebar-toggle"
+        onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+        aria-label={sidebarCollapsed ? "展开边栏" : "收起边栏"}
+        aria-expanded={!sidebarCollapsed}
+        aria-controls="workspace-sidebar"
+        title={sidebarCollapsed ? "展开边栏" : "收起边栏"}
+      >
+        {sidebarCollapsed ? <PanelLeftOpen size={19} aria-hidden="true" /> : <PanelLeftClose size={19} aria-hidden="true" />}
+      </button>
+      <aside id="workspace-sidebar" className="sidebar" inert={sidebarCollapsed}>
         <Link className="brand" href="/" aria-label="问山首页">
           <span className="brand-icon">
             <Mountain size={21} strokeWidth={1.7} />
@@ -588,14 +602,10 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
             <MoreHorizontal size={16} aria-hidden="true" />
           </button>
           <Link className="side-user" href="/me">
-            <span className="side-avatar zhihu">知</span>
+            <Image className="side-avatar zhihu" src="/zhihu-official.ico" alt="" width={20} height={20} unoptimized />
             <span className="side-user-name">我的知乎</span>
             <ArrowRight size={15} aria-hidden="true" />
           </Link>
-          <div className="privacy">
-            <ShieldCheck size={13} />
-            <span>匿名探索 · 会话保留 24 小时</span>
-          </div>
         </div>
       </aside>
 

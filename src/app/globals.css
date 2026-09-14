@@ -2686,7 +2686,7 @@ summary {
 .me-list a:hover { color: var(--green); }
 .me-list span { color: var(--ink); font-size: 14px; }
 .me-list small { color: var(--muted); font-size: 12px; white-space: nowrap; }
-.side-avatar.zhihu { background: #1772f6; }
+.side-avatar.zhihu { display: block; width: 20px; height: 20px; flex-shrink: 0; object-fit: contain; }
 
 /* ===== 手机端底部导航 ===== */
 .mobile-tabbar {
@@ -2724,4 +2724,46 @@ summary {
   .discovery-note { display: none; }
   .feed-layout { grid-template-columns: 1fr; }
   .history-panel h1 { font-size: 20px; }
+}
+
+/* Keep the sidebar toggle mounted to preserve keyboard focus. */
+.sidebar-toggle { display: none; }
+@media (min-width: 801px) {
+  .agent-workspace { --workspace-sidebar-width: 264px; }
+  .agent-workspace .sidebar { transition: transform 180ms ease, visibility 180ms; }
+  .agent-workspace .sidebar .brand { margin-right: 42px; }
+  .agent-workspace .main-shell { transition: margin-left 180ms ease; }
+  .agent-workspace .sidebar-toggle {
+    position: fixed;
+    top: 18px;
+    left: calc(var(--workspace-sidebar-width) - 48px);
+    /* Above product navigation (60), below dialogs and onboarding. */
+    z-index: 61;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: #53739f;
+    cursor: pointer;
+    transition: left 180ms ease, background 150ms ease;
+  }
+  .agent-workspace .sidebar-toggle:hover { background: #e8f1ff; color: #056de8; }
+  .agent-workspace .sidebar-toggle:focus-visible { outline: 2px solid #056de8; outline-offset: 3px; }
+  .agent-workspace.sidebar-collapsed .sidebar { transform: translateX(-100%); visibility: hidden; }
+  .agent-workspace.sidebar-collapsed .main-shell { margin-left: 0; }
+  .agent-workspace.sidebar-collapsed .sidebar-toggle { left: 16px; background: #f5f9ff; border-color: #d9e9ff; }
+  body:has(.agent-workspace.sidebar-collapsed) .product-nav--agent { margin-left: 0; padding-left: 64px; }
+}
+@media (min-width: 801px) and (max-width: 1120px) {
+  .agent-workspace { --workspace-sidebar-width: 240px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-workspace .sidebar,
+  .agent-workspace .main-shell,
+  .agent-workspace .sidebar-toggle { transition: none; }
 }
