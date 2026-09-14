@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -12,9 +13,44 @@ const products = [
 export function ProductNav() {
   const pathname = usePathname();
   const isAgentRoute = pathname === "/";
+  const navRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!isAgentRoute) return;
+
+    const nav = navRef.current;
+    let scroller: HTMLElement | null = null;
+    let attachFrame = 0;
+
+    const updateAppearance = () => {
+      nav?.classList.toggle(
+        "product-nav--scrolled",
+        (scroller?.scrollTop ?? 0) > 16,
+      );
+    };
+
+    const attach = () => {
+      scroller = document.querySelector<HTMLElement>(".agent-main-scroll");
+      if (!scroller) {
+        attachFrame = window.requestAnimationFrame(attach);
+        return;
+      }
+
+      updateAppearance();
+      scroller.addEventListener("scroll", updateAppearance, { passive: true });
+    };
+
+    attach();
+    return () => {
+      window.cancelAnimationFrame(attachFrame);
+      scroller?.removeEventListener("scroll", updateAppearance);
+      nav?.classList.remove("product-nav--scrolled");
+    };
+  }, [isAgentRoute]);
 
   return (
     <nav
+      ref={navRef}
       className={`product-nav${isAgentRoute ? " product-nav--agent" : ""}`}
       aria-label="功能导航"
     >

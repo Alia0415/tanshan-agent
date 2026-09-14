@@ -4,15 +4,24 @@ import {
   ArrowUpRight,
   BookOpen,
   Check,
+  Link2,
   ThumbsDown,
   ThumbsUp,
 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { filterZhihuPosts, previewExcerpt, sourceSignals } from "@/lib/domain/sources";
-import type { Answer, ClarificationResponse, ClarificationRevision } from "@/lib/domain/types";
+import type { Answer, ClarificationResponse, ClarificationRevision, Source } from "@/lib/domain/types";
 import { ContextTags } from "./context-fields";
 import { BookmarkButton } from "./bookmarks";
 import { ConditionEditor } from "./condition-editor";
+import { ResonanceGlobeOverlay } from "./resonance-globe-overlay";
+
+type ResonanceState = {
+  source: Source;
+  count: number | null;
+  loading: boolean;
+  error: string;
+};
 
 function Citations({ ids, answer }: { ids: number[]; answer: Answer }) {
   return (
@@ -63,6 +72,48 @@ export function AnswerCard({
   const [reason, setReason] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [resonance, setResonance] = useState<ResonanceState | null>(null);
+  const [connectedCounts, setConnectedCounts] = useState<Record<string, number>>({});
+  const closeResonance = useCallback(() => setResonance(null), []);
+
+  async function connect(source: Source) {
+    const sourceKey = source.content_id || source.url;
+    setResonance({ source, count: null, loading: true, error: "" });
+    try {
+      const response = await fetch("/api/resonance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: answer.focused_question,
+          source_id: sourceKey,
+          source_title: source.title,
+          source_author: source.author || "作者未提供",
+          source_url: source.url,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { count?: number; error?: { message?: string } }
+        | null;
+      if (!response.ok || typeof payload?.count !== "number") {
+        throw new Error(payload?.error?.message || "共鸣人数暂时无法读取。");
+      }
+      const count = payload.count;
+      setConnectedCounts((previous) => ({ ...previous, [sourceKey]: count }));
+      setResonance((current) =>
+        current?.source.url === source.url
+          ? { ...current, count, loading: false }
+          : current,
+      );
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "共鸣人数暂时无法读取。";
+      setResonance((current) =>
+        current?.source.url === source.url
+          ? { ...current, loading: false, error: message }
+          : current,
+      );
+    }
+  }
+
   async function send(type: "helpful" | "irrelevant") {
     setSending(true);
     setError("");
@@ -115,42 +166,73 @@ export function AnswerCard({
               : "点击帖子查看知乎原文；这里保留搜索返回的摘要。"}
         </p>
         {posts.length ? (
-          posts.map((source) => (
-            <div key={source.id} className="bookmark-post-card">
-            <a
-              id={`source-${answer.id}-${source.id}`}
-              className="source-card"
-              key={source.id}
-              href={source.url}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <span className="source-number">{source.id}</span>
-              <div>
-                <strong>{source.title}</strong>
-                <p>
-                  知乎 · {source.author || "作者未提供"} ·{" "}
-                  {source.type.toLowerCase() === "answer"
-                    ? "回答"
-                    : source.type.toLowerCase() === "article"
-                      ? "文章"
-                      : "问题"}
-                  {sourceSignals(source) && ` · ${sourceSignals(source)}`}
-                </p>
-                <small>
-                  {previewExcerpt(source)}
-                </small>
-                {source.relevance && (
-                  <p>筛选说明：{source.relevance.reason} {source.relevance.caveat}</p>
-                )}
+          posts.map((source) => {
+            const sourceKey = source.content_id || source.url;
+            const connectedCount = connectedCounts[sourceKey];
+            return (
+              <div key={source.id} className="bookmark-post-card">
+                <article
+                  id={`source-${answer.id}-${source.id}`}
+                  className="source-card"
+                >
+                  <a
+                    className="source-card-link"
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <span className="source-number">{source.id}</span>
+                    <div>
+                      <strong>{source.title}</strong>
+                      <p>
+                        知乎 · {source.author || "作者未提供"} ·{" "}
+                        {source.type.toLowerCase() === "answer"
+                          ? "回答"
+                          : source.type.toLowerCase() === "article"
+                            ? "文章"
+                            : "问题"}
+                        {sourceSignals(source) && ` · ${sourceSignals(source)}`}
+                      </p>
+                      <small>{previewExcerpt(source)}</small>
+                      {source.relevance && (
+                        <p>
+                          筛选说明：{source.relevance.reason} {source.relevance.caveat}
+                        </p>
+                      )}
+                    </div>
+                  </a>
+                  <div className="source-card-actions">
+                    <a
+                      className="post-open"
+                      href={source.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      打开知乎原帖 <ArrowUpRight size={15} />
+                    </a>
+                    <button
+                      type="button"
+                      className={`resonance-trigger${connectedCount ? " connected" : ""}`}
+                      aria-label={`连接这段经历：${source.title}`}
+                      onClick={() => void connect(source)}
+                    >
+                      <Link2 size={14} />
+                      {connectedCount ? `已连接 · ${connectedCount}` : "连接"}
+                    </button>
+                  </div>
+                </article>
+                <BookmarkButton
+                  corner
+                  post={{
+                    url: source.url,
+                    title: source.title,
+                    author: source.author || "",
+                    excerpt: previewExcerpt(source),
+                  }}
+                />
               </div>
-              <span className="post-open">
-                打开知乎原帖 <ArrowUpRight size={15} />
-              </span>
-            </a>
-            <BookmarkButton corner post={{ url: source.url, title: source.title, author: source.author || "", excerpt: previewExcerpt(source) }} />
-            </div>
-          ))
+            );
+          })
         ) : (
           <p className="empty-sources">
             {answer.evidence === "demo"
@@ -269,6 +351,18 @@ export function AnswerCard({
         <p role="alert" className="error-text">
           {error}
         </p>
+      )}
+      {resonance && (
+        <ResonanceGlobeOverlay
+          open
+          sourceTitle={resonance.source.title}
+          sourceAuthor={resonance.source.author || "知乎作者"}
+          question={answer.focused_question}
+          count={resonance.count}
+          loading={resonance.loading}
+          error={resonance.error}
+          onClose={closeResonance}
+        />
       )}
     </article>
   );
