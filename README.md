@@ -10,19 +10,19 @@
 
 ## 页面预览
 
-以下为当前应用的本地实拍，采用窄屏布局；点击图片可查看原图。阅读页的热榜内容会随时间变化，圆桌截图展示尚未发起讨论的会场。
+以下为应用的桌面端页面截图，每张独立展示，点击可查看原图。阅读页的热榜内容会随时间变化，圆桌截图展示主持人开场与角色入席。
 
 ### 问答首页
 
-[![探山问答首页：提问框、智能追问和场景示例](docs/screenshots/home.jpg)](docs/screenshots/home.jpg)
+[![探山问答首页：提问框、智能追问和场景示例](docs/screenshots/home.png)](docs/screenshots/home.png)
 
 ### 阅读发现
 
-[![阅读发现：热点问题与月亮唱片浏览界面](docs/screenshots/reading.jpg)](docs/screenshots/reading.jpg)
+[![阅读发现：热点问题与月亮唱片浏览界面](docs/screenshots/reading.png)](docs/screenshots/reading.png)
 
 ### 观点圆桌
 
-[![观点圆桌：夜间会场、主题切换与 Agent 库](docs/screenshots/roundtable.jpg)](docs/screenshots/roundtable.jpg)
+[![观点圆桌：夜间会场、主题切换与 Agent 库](docs/screenshots/roundtable.png)](docs/screenshots/roundtable.png)
 
 ## 功能入口
 
