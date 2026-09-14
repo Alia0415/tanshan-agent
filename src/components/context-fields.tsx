@@ -132,19 +132,31 @@ export function ContextFields({
   );
 }
 
-export function ContextTags({ context }: { context: Context }) {
+export function ContextTags({ context, labels, onSelect, disabled = false }: {
+  context: Context;
+  labels?: string[];
+  onSelect?: (label: string) => void;
+  disabled?: boolean;
+}) {
   return (
     <div className="tags">
-      {[
+      {(labels?.length ? labels : [
         context.topic,
         context.purpose && PURPOSES[context.purpose],
         context.scenario,
         ...context.priorities,
         context.constraints,
-      ]
+      ])
         .filter(Boolean)
         .map((label, index) => (
-          <span key={`${label}-${index}`}>{label}</span>
+          onSelect && label ? (
+            <button type="button" key={index}
+              className="editable-context-tag" disabled={disabled}
+              title={"修改条件：" + label} aria-label={"修改条件：" + label}
+              onClick={() => onSelect(label)}>
+              {label}<span aria-hidden="true"> ✎</span>
+            </button>
+          ) : <span key={index} title={label || undefined}>{label}</span>
         ))}
     </div>
   );

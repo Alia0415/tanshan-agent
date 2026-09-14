@@ -89,10 +89,10 @@ export async function exchangeToken(code: string) {
 }
 
 type OAuthRow = { visitor: string; access_token: string; expires_at: number };
-const state = globalThis as unknown as { wenshanOauthReady?: DatabaseSync };
+const state = globalThis as unknown as { tanshanOauthReady?: DatabaseSync };
 
 function ensureTable() {
-  if (state.wenshanOauthReady) return;
+  if (state.tanshanOauthReady) return;
   db().exec(`
     CREATE TABLE IF NOT EXISTS oauth_sessions (
       visitor TEXT PRIMARY KEY,
@@ -100,7 +100,7 @@ function ensureTable() {
       expires_at INTEGER NOT NULL
     );
   `);
-  state.wenshanOauthReady = db();
+  state.tanshanOauthReady = db();
 }
 
 export function saveOAuthSession(visitor: string, token: string, expiresIn: number) {

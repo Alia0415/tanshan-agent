@@ -45,6 +45,12 @@ export const patchSchema = z
   .object({
     context_version: version,
     changes: contextSchema,
+    clarification_revision: z.object({
+      history_index: z.number().int().nonnegative(),
+      selected: z.array(z.string().trim().min(1).max(120)).max(8)
+        .refine((values) => new Set(values).size === values.length, "选项不能重复"),
+      free_text: freeText,
+    }).strict().optional(),
     free_text: freeText,
   })
   .strict();

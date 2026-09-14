@@ -4,8 +4,6 @@ import { postMessage } from "@/lib/server/roundtables";
 export const runtime = "nodejs";
 const messageSchema = z.object({
   content: z.string().trim().min(1).max(300),
-  requestId: z.string().min(8).max(64),
-  revision: z.number().int().min(0),
 });
 export async function POST(request: Request, context: RouteContext) {
   return handle(async () => {
@@ -14,7 +12,6 @@ export async function POST(request: Request, context: RouteContext) {
       (await context.params).id,
       await identity(),
       input.content,
-      input,
     );
   });
 }

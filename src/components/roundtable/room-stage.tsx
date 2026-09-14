@@ -1,13 +1,9 @@
 'use client';
-import { type DragEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { createPortal } from 'react-dom';
+import { type DragEvent, useEffect, useRef, useState } from 'react';
+
 import type { Roundtable } from '@/lib/roundtable/engine';
 import './room-stage.css';
-
-const emptySubscribe = () => () => {};
-function readMounted() {
-  return true;
-}
+import { displayClaim } from '@/lib/roundtable/brief';
 
 export const TURN_MS = 16000;
 const seats = [
@@ -288,67 +284,47 @@ function Sprite({
 }
 
 export function RoomStage({
+  summaries = {},
   round,
   visible,
-  playing,
   scene,
   onScene,
-  onTurnEnd,
+  onJoinGuest,
+  canJoinGuest,
 }: {
+  summaries?: Record<string, string>;
   round: Pick<Roundtable, "roles" | "messages" | "scheduler">;
   visible: number;
-  playing: boolean;
   scene: string;
   onScene: (scene: string | null) => void;
-  onTurnEnd: () => void;
+  onJoinGuest: (id: string) => Promise<boolean>;
+  canJoinGuest: boolean;
 }) {
   const [clock, setClock] = useState(0);
   const [playhead, setPlayhead] = useState({ message: '', elapsed: 0 });
   const time = useRef({ message: '', elapsed: 0, last: 0 });
-  const completed = useRef('');
   const message = round.messages[Math.min(visible, round.messages.length) - 1];
+  const bubbleText = message ? displayClaim(message, summaries) : undefined;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [guestAgents, setGuestAgents] = useState<GuestAgent[]>([]);
   const [draggingAgent, setDraggingAgent] = useState('');
   const worldRef = useRef<HTMLDivElement>(null);
   const [reduced, setReduced] = useState(false);
-  function addAgent(id: string, position?: { x: number; y: number }) {
+  const pendingGuest = useRef(false);
+  async function addAgent(id: string, position?: { x: number; y: number }) {
     const agent = agentLibrary.find((item) => item.id === id);
-    if (!agent || guestAgents.some((item) => item.id === id)) return;
+    if (!canJoinGuest || pendingGuest.current || !agent || guestAgents.some((item) => item.id === id)) return;
     const spot = position ?? guestSpots[guestAgents.length % guestSpots.length];
-    setGuestAgents((current) => [...current, { ...agent, ...spot }]);
-  }
-  // Guests walk in by themselves when it is their turn to interject; the
-  // presence is derived from the transcript instead of effect-driven state.
-  const summonedGuests = useMemo(() => {
-    const seen = new Set<string>();
-    for (
-      let i = 0;
-      i < Math.min(visible, round.messages.length);
-      i++
-    ) {
-      const speaker = round.messages[i].speaker;
-      if (agentLibrary.some((agent) => agent.id === speaker))
-        seen.add(speaker);
+    pendingGuest.current = true;
+    try {
+      if (await onJoinGuest(id))
+        setGuestAgents((current) => [...current, { ...agent, ...spot }]);
+    } finally {
+      pendingGuest.current = false;
     }
-    return [...seen].map((id, index) => {
-      const agent = agentLibrary.find((item) => item.id === id)!;
-      return { ...agent, ...guestSpots[index % guestSpots.length] };
-    });
-  }, [round.messages, visible]);
-  const presentGuests = useMemo(() => {
-    const manual = new Set(guestAgents.map((agent) => agent.id));
-    const auto = summonedGuests
-      .filter((agent) => !manual.has(agent.id))
-      .map((agent, index) => ({
-        ...agent,
-        ...guestSpots[
-          (guestAgents.length + index) % guestSpots.length
-        ],
-      }));
-    return [...guestAgents, ...auto];
-  }, [guestAgents, summonedGuests]);
+  }
+  const presentGuests = guestAgents;
   function positionInWorld(clientX: number, clientY: number) {
     const bounds = worldRef.current?.getBoundingClientRect();
     if (
@@ -371,6 +347,11 @@ export function RoomStage({
     };
   }
   function finishAgentDrag(id: string, clientX: number, clientY: number) {
+    const target = document.elementFromPoint(clientX, clientY);
+    if (target?.closest(".room-controls")) {
+      setDraggingAgent('');
+      return;
+    }
     const position = positionInWorld(clientX, clientY);
     if (position) addAgent(id, position);
     setDraggingAgent('');
@@ -395,7 +376,8 @@ export function RoomStage({
       const now = performance.now();
       if (time.current.message !== message?.id)
         time.current = { message: message?.id ?? '', elapsed: 0, last: now };
-      if (playing)
+      // React to delivered messages independently of automatic turn generation.
+      if (message)
         time.current.elapsed = Math.min(
           TURN_MS,
           time.current.elapsed + now - time.current.last,
@@ -408,16 +390,8 @@ export function RoomStage({
       });
     }, 100);
     return () => clearInterval(timer);
-  }, [message?.id, playing]);
+  }, [message]);
   const elapsed = playhead.message === message?.id ? playhead.elapsed : 0;
-  useEffect(() => {
-    if (playing && elapsed >= TURN_MS && completed.current !== message?.id) {
-      completed.current = message?.id ?? '';
-      onTurnEnd();
-    }
-    if (!playing) completed.current = '';
-    if (elapsed < TURN_MS) completed.current = '';
-  }, [elapsed, playing, message?.id, onTurnEnd]);
   const tick = reduced ? 0 : Math.floor(clock / 190);
   const state = (active: boolean, index: number): Action => {
     if (!active || elapsed >= 15000) {
@@ -438,17 +412,34 @@ export function RoomStage({
     if (elapsed < 14300) return '返回沙发';
     return '坐下';
   };
-  // 场景设置与 Agent 库整体传送进聊天框（#chat-controls-slot）；
-  // 挂载后才启用 Portal，避免服务端/客户端水合不一致报错
-  const mounted = useSyncExternalStore(emptySubscribe, readMounted, () => false);
-  const controlsSlot =
-    !mounted || typeof document === 'undefined'
-      ? null
-      : document.getElementById('chat-controls-slot');
-  const controls = (
-    <div className="room-controls chat-controls">
-      <div className="room-control-bar">
-        <div className="room-control-tabs">
+  return (
+    <section className="room-experience" aria-label="可视化圆桌">
+
+      <div
+        ref={worldRef}
+        className={'room-world room-' + scene}
+        onDragOver={(event) => {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = 'copy';
+        }}
+        onDrop={dropAgent}
+        onPointerUp={(event) => {
+          if (draggingAgent)
+            finishAgentDrag(draggingAgent, event.clientX, event.clientY);
+        }}
+      >
+        <div
+          className="room-controls room-theme-controls"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              setSettingsOpen(false);
+              event.currentTarget.querySelector('button')?.focus();
+            }
+          }}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) setSettingsOpen(false);
+          }}
+        >
           <button
             type="button"
             onClick={() => {
@@ -458,7 +449,7 @@ export function RoomStage({
             aria-expanded={settingsOpen}
             aria-controls="room-settings"
           >
-            场景设置
+            主题
           </button>
           <button
             type="button"
@@ -471,9 +462,38 @@ export function RoomStage({
           >
             Agent 库{presentGuests.length > 0 && <b>{presentGuests.length}</b>}
           </button>
+      {libraryOpen && (
+        <div id="agent-library" className="agent-library">
+          {agentLibrary.map((agent) => {
+            const joined = presentGuests.some((item) => item.id === agent.id);
+            return (
+              <button
+                key={agent.id}
+                type="button"
+                draggable={!joined && canJoinGuest}
+                disabled={joined || !canJoinGuest}
+                onDragStart={(event) => {
+                  setDraggingAgent(agent.id);
+                  event.dataTransfer.setData(
+                    'application/x-round-agent',
+                    agent.id,
+                  );
+                  event.dataTransfer.setData('text/plain', agent.id);
+                  event.dataTransfer.effectAllowed = 'copy';
+                }}
+                onPointerDown={() => setDraggingAgent(agent.id)}
+                onDragEnd={(event) =>
+                  finishAgentDrag(agent.id, event.clientX, event.clientY)
+                }
+              >
+                <span className="agent-library-avatar" aria-hidden="true" />
+                <strong>{agent.name}</strong>
+                <em>{joined ? '已加入' : '拖入场景'}</em>
+              </button>
+            );
+          })}
         </div>
-        <span>{!round.messages.length ? '等待发起' : playing ? '圆桌进行中' : '已暂停'}</span>
-      </div>
+      )}
       {settingsOpen && (
         <div id="room-settings">
           {[
@@ -495,57 +515,7 @@ export function RoomStage({
           </button>
         </div>
       )}
-      {libraryOpen && (
-        <div id="agent-library" className="agent-library">
-          {agentLibrary.map((agent) => {
-            const joined = presentGuests.some((item) => item.id === agent.id);
-            return (
-              <button
-                key={agent.id}
-                type="button"
-                draggable={!joined}
-                disabled={joined}
-                onDragStart={(event) => {
-                  setDraggingAgent(agent.id);
-                  event.dataTransfer.setData(
-                    'application/x-round-agent',
-                    agent.id,
-                  );
-                  event.dataTransfer.setData('text/plain', agent.id);
-                  event.dataTransfer.effectAllowed = 'copy';
-                }}
-                onPointerDown={() => setDraggingAgent(agent.id)}
-                onDragEnd={(event) =>
-                  finishAgentDrag(agent.id, event.clientX, event.clientY)
-                }
-                onClick={() => addAgent(agent.id)}
-              >
-                <span className="agent-library-avatar" aria-hidden="true" />
-                <strong>{agent.name}</strong>
-                <em>{joined ? '已加入' : '拖入场景'}</em>
-              </button>
-            );
-          })}
         </div>
-      )}
-    </div>
-  );
-  return (
-    <section className="room-experience" aria-label="可视化圆桌">
-      {controlsSlot && createPortal(controls, controlsSlot)}
-      <div
-        ref={worldRef}
-        className={'room-world room-' + scene}
-        onDragOver={(event) => {
-          event.preventDefault();
-          event.dataTransfer.dropEffect = 'copy';
-        }}
-        onDrop={dropAgent}
-        onPointerUp={(event) => {
-          if (draggingAgent)
-            finishAgentDrag(draggingAgent, event.clientX, event.clientY);
-        }}
-      >
         {['morning', 'strategy', 'night'].map((s) => (
           <div
             key={s}
@@ -595,7 +565,7 @@ export function RoomStage({
                   ? 'seated'
                   : 'standing')
               }
-              style={{ left: x + '%', top: y + '%', zIndex: Math.round(y) }}
+              style={{ left: x + '%', top: y + '%', zIndex: action === '发言中' ? 95 : Math.round(y) }}
               data-action={action}
             >
               <div
@@ -610,6 +580,11 @@ export function RoomStage({
                   walking={direction}
                 />
               </div>
+              {active && elapsed < 11800 && bubbleText && (
+                <div className="room-speech" role="status" aria-label={role.name + '的观点'} key={message.id}>
+                  {bubbleText}
+                </div>
+              )}
               <span className="room-name">{role.name}</span>
             </div>
           );
@@ -632,6 +607,11 @@ export function RoomStage({
                 walking="walk-front"
               />
             </div>
+            {agent.id === message?.speaker && state(true, index) === '发言中' && bubbleText && (
+              <div className="room-speech" role="status" aria-label={agent.name + '的观点'} key={message.id}>
+                {bubbleText}
+              </div>
+            )}
             <span className="room-name">{agent.name}</span>
           </div>
         ))}
@@ -643,9 +623,7 @@ export function RoomStage({
           {round.messages.length > 0 && ` · 第 ${visible} 条发言`}
         </span>
         <p>
-          {elapsed >= 5300 || !playing
-            ? (message?.content ?? '观点角色将根据真实知乎资料生成，发起后在这里入席。')
-            : '正在起身前往圆桌，请稍候…'}
+          {message?.content ?? '观点角色将根据真实知乎资料生成，发起后在这里入席。'}
         </p>
       </div>
     </section>

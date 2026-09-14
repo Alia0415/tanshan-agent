@@ -20,15 +20,16 @@ import {
   Mountain,
   PanelLeftClose,
   PanelLeftOpen,
-  PencilLine,
   Plus,
   RotateCcw,
+  Trash2,
   ShieldCheck,
   Sparkles,
   X,
 } from "lucide-react";
 import { MAX_CLARIFICATION_ROUNDS, type Context, type ContextPatch, type Session, type SessionSummary } from "@/lib/domain/types";
 import { ContextFields, ContextTags } from "./context-fields";
+import { BookmarkLibraryButton } from "./bookmarks";
 import { AnswerCard } from "./answer-card";
 import { WaveProgressFloat } from "./wave-progress";
 import { SearchProgress } from "./search-progress";
@@ -154,14 +155,17 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
   const [notice, setNotice] = useState("");
   const [restoring, setRestoring] = useState(true);
   const [finishingClarification, setFinishingClarification] = useState(false);
-  const [editing, setEditing] = useState(false);
   const [about, setAbout] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyResult, setHistoryResult] = useState<{ answerId: string } | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [history, setHistory] = useState<SessionSummary[]>([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [connectionLost, setConnectionLost] = useState(false);
   const [reconnect, setReconnect] = useState(0);
+  const [deleteTarget, setDeleteTarget] = useState<SessionSummary | null>(null);
+  const deleteDialog = useRef<HTMLDialogElement>(null);
+  const deletedSessions = useRef(new Set<string>());
   const lock = useRef(false);
   const epoch = useRef(0);
   const questionInput = useRef<HTMLTextAreaElement>(null);
@@ -175,7 +179,7 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
           "/api/sessions",
         );
         if (active) {
-          setHistory(result.sessions);
+          setHistory(result.sessions.filter((item) => !deletedSessions.current.has(item.session_id)));
           setHistoryLoaded(true);
         }
       } catch {
@@ -185,7 +189,12 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
     return () => {
       active = false;
     };
-  }, []);
+  }, [session?.session_id, session?.answers.length]);
+
+  useEffect(() => {
+    if (!historyResult || historyOpen) return;
+    document.getElementById("history-post-results")?.scrollIntoView({ block: "start" });
+  }, [historyResult, historyOpen]);
 
   function dialogKeys(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.key === "Escape") setAbout(false);
@@ -397,36 +406,33 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
       ),
     );
   }
-  function edit() {
-    if (!session) return;
-    setEditing(true);
-    setFreeText("");
-    setContext(structuredClone(session.confirmed_context));
+  async function loadRevisionChoices(label: string, answerId: string) {
+    if (!session) throw new Error("会话已结束");
+    const result = await api<{ history_index: number; card: import("@/lib/domain/types").ClarificationCard }>(
+      "/api/sessions/" + session.session_id + "/revision-choices", "POST",
+      { context_version: session.context_version, answer_id: answerId, label },
+    );
+    return result;
   }
-  function saveContext() {
+  function editCondition(revision: import("@/lib/domain/types").ClarificationRevision) {
     if (!session) return;
-    const changes: ContextPatch = { ...context };
-    for (const key of ["topic", "scenario", "constraints"] as const)
-      changes[key] = context[key] || null;
-    void run("正在保存条件", async (ticket) => {
+    setHistoryResult(null);
+    void run("正在保存新选择", async (ticket) => {
       const result = await api<Result>(
-        `/api/sessions/${session.session_id}/context`,
-        "PATCH",
-        {
+        "/api/sessions/" + session.session_id + "/context", "PATCH", {
           context_version: session.context_version,
-          changes,
-          free_text: freeText,
+          changes: {},
+          clarification_revision: revision,
         },
       );
-      if (ticket === epoch.current) {
-        apply(result.session);
-        setEditing(false);
-        setFreeText("");
-      }
+      if (ticket !== epoch.current) return;
+      apply(result.session);
+      await generate(result.session, ticket);
     });
   }
   function newQuestion() {
     if (busy) return;
+    setHistoryResult(null);
     setHistoryOpen(false);
     epoch.current += 1;
     setSession(null);
@@ -434,7 +440,6 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
     setQuestion("");
     setContext(emptyContext());
     setFreeText("");
-    setEditing(false);
     setClarificationAnswers([]);
     setNotice("");
     setConnectionLost(false);
@@ -448,8 +453,34 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
     setHistoryLoaded(false);
     void run("正在读取历史问题", async () => {
       const result = await api<{ sessions: SessionSummary[] }>("/api/sessions");
-      setHistory(result.sessions);
+      setHistory(result.sessions.filter((item) => !deletedSessions.current.has(item.session_id)));
       setHistoryLoaded(true);
+    });
+  }
+  function removeHistory(id: string) {
+    if (lock.current || restoring) return;
+    const item = history.find((entry) => entry.session_id === id);
+    if (!item) return;
+    setDeleteTarget(item);
+    deleteDialog.current?.showModal();
+  }
+  function cancelDelete() {
+    deleteDialog.current?.close();
+    setDeleteTarget(null);
+  }
+  function confirmDelete() {
+    if (!deleteTarget || lock.current || restoring) return;
+    const id = deleteTarget.session_id;
+    cancelDelete();
+    void run("正在删除历史记录", async () => {
+      await api("/api/sessions/" + encodeURIComponent(id), "DELETE", {});
+      deletedSessions.current.add(id);
+      setHistory((items) => items.filter((item) => item.session_id !== id));
+      if (session?.session_id === id) {
+        newQuestion();
+        setHistoryOpen(historyOpen);
+        setBusy("");
+      }
     });
   }
   function openSession(id: string) {
@@ -458,10 +489,13 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
       epoch.current += 1;
       setSession(result.session);
       setContext(structuredClone(result.session.confirmed_context));
+      const answer = result.session.answers.find(
+        (item) => item.context_version === result.session.context_version,
+      ) ?? result.session.answers.at(-1);
+      setHistoryResult(result.session.stage === "completed" && answer ? { answerId: answer.id } : null);
       remember(id);
       setFreeText("");
       setClarificationAnswers([]);
-      setEditing(false);
       setFinishingClarification(false);
       setConnectionLost(false);
       pendingAnswer.current = null;
@@ -492,8 +526,9 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
     session && ["searching", "generating"].includes(session.stage);
   const showClarificationProgress =
     Boolean(session) &&
+    !historyResult &&
     ((session?.stage === "clarifying" && Boolean(session.clarification)) || finishingClarification) &&
-    !editing && !about && !historyOpen;
+    !about && !historyOpen;
   const clarificationRound = Math.min(
     MAX_CLARIFICATION_ROUNDS,
     (session?.clarification_count ?? 0) + 1,
@@ -501,9 +536,11 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
   const currentAnswer = session?.answers.find(
     (answer) => answer.context_version === session.context_version,
   );
+  const historyAnswer = session?.answers.find((answer) => answer.id === historyResult?.answerId);
+  const displayedAnswer = historyAnswer ?? currentAnswer;
   const oldAnswers =
     session?.answers.filter(
-      (answer) => answer.context_version !== session.context_version,
+      (answer) => answer.context_version !== session.context_version && answer.id !== historyAnswer?.id,
     ) || [];
   const feedback = async (
     answerId: string,
@@ -534,12 +571,12 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
         {sidebarCollapsed ? <PanelLeftOpen size={19} aria-hidden="true" /> : <PanelLeftClose size={19} aria-hidden="true" />}
       </button>
       <aside id="workspace-sidebar" className="sidebar" inert={sidebarCollapsed}>
-        <Link className="brand" href="/" aria-label="问山首页">
+        <Link className="brand" href="/" aria-label="探山首页">
           <span className="brand-icon">
             <Mountain size={21} strokeWidth={1.7} />
           </span>
           <span>
-            问山<small>WENSHAN</small>
+            探山<small>TANSHAN</small>
           </span>
         </Link>
         <button
@@ -575,9 +612,9 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
             <div className="side-group" key={group.label}>
               <div className="side-group-label">{group.label}</div>
               {group.items.map((item) => (
+                <div className="history-row" key={item.session_id}>
                 <button
                   type="button"
-                  key={item.session_id}
                   className={`side-history-item${
                     item.session_id === sessionId ? " current" : ""
                   }`}
@@ -587,6 +624,12 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
                 >
                   {item.original_question}
                 </button>
+                <button type="button" className="history-delete" disabled={Boolean(busy) || restoring}
+                  aria-label={"删除历史问题：" + item.original_question} title="删除记录"
+                  onClick={() => removeHistory(item.session_id)}>
+                  <Trash2 size={15} aria-hidden="true" />
+                </button>
+                </div>
               ))}
             </div>
           ))}
@@ -610,6 +653,7 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
             </span>
             <MoreHorizontal size={16} aria-hidden="true" />
           </button>
+          <BookmarkLibraryButton />
           <Link className="side-user" href="/me">
             <Image className="side-avatar zhihu" src="/zhihu-official.ico" alt="" width={20} height={20} unoptimized />
             <span className="side-user-name">我的知乎</span>
@@ -623,13 +667,13 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
           <div className="breadcrumb">
             <span className="mobile-brand">
               <Mountain size={21} />
-              问山
+              探山
             </span>
-            <Link className="header-brand" href="/">问山</Link>
+            <Link className="header-brand" href="/">探山</Link>
             <nav className="header-nav" aria-label="主导航">
               <button type="button" className={historyOpen ? "" : "nav-current"} onClick={() => { setHistoryOpen(false); document.getElementById("main-content")?.scrollIntoView({ behavior: "smooth" }); }}>{session ? "当前提问" : "首页"}</button>
               <button type="button" className={historyOpen ? "nav-current" : ""} onClick={openHistory} disabled={Boolean(busy) || restoring}>历史问题</button>
-              <button type="button" className="nav-about" onClick={() => setAbout(true)}>关于问山</button>
+              <button type="button" className="nav-about" onClick={() => setAbout(true)}>关于探山</button>
             </nav>
           </div>
           <div className="topbar-right">
@@ -679,10 +723,17 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
               {!busy && !historyLoaded && <button type="button" className="text-button" onClick={openHistory}>重新加载</button>}
               {historyLoaded && history.length === 0 && <p className="history-empty">还没有历史问题，开启一次新提问吧。</p>}
               {historyLoaded && <div className="history-list">{history.map((item) => (
-                <button type="button" className="history-entry" key={item.session_id} disabled={Boolean(busy)} onClick={() => openSession(item.session_id)}>
+                <div className="history-row" key={item.session_id}>
+                <button type="button" className="history-entry" disabled={Boolean(busy)} onClick={() => openSession(item.session_id)}>
                   <strong>{item.original_question}</strong>
                   <span><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString("zh-CN")}</time><span>{stageLabels[item.stage]}{item.session_id === sessionId ? " · 当前" : ""}</span></span>
                 </button>
+                <button type="button" className="history-delete" disabled={Boolean(busy) || restoring}
+                  aria-label={"删除历史问题：" + item.original_question} title="删除记录"
+                  onClick={() => removeHistory(item.session_id)}>
+                  <Trash2 size={16} aria-hidden="true" />
+                </button>
+                </div>
               ))}</div>}
             </section>
           ) : !session ? (
@@ -695,12 +746,8 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
 
               <div className={homeStyles.hero}>
                 <h1 id="landing-title">
-                  你好，<em>这里是问山。</em>
+                  你好，<em>这里是探山</em>
                 </h1>
-                <p className={homeStyles.lead}>多问一句，答案更近一步。</p>
-                <p className={homeStyles.supportingCopy}>
-                  说说你的问题和处境，一起找到适合你的知乎经验。
-                </p>
               </div>
 
               <nav className={homeStyles.entries} aria-label="其他入口">
@@ -776,7 +823,7 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
                 <div className={homeStyles.composerBar}>
                   <span
                     className={homeStyles.mode}
-                    title="信息不足时问山会先追问，再回答"
+                    title="信息不足时探山会先追问，再回答"
                   >
                     <Sparkles size={13} aria-hidden="true" />
                     智能追问
@@ -867,7 +914,17 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
             <>
               <div className="user-message">
                 <span className="user-label">你的问题</span>
-                <h1>{session.original_question}</h1>
+                <div className="question-roundtable-row">
+                  <h1>{session.original_question}</h1>
+                  <Link
+                    className="question-roundtable-link"
+                    href={{ pathname: "/roundtable", query: { q: session.original_question } }}
+                  >
+                    <MessagesSquare size={16} aria-hidden="true" />
+                    带到圆桌讨论
+                    <ArrowRight size={14} aria-hidden="true" />
+                  </Link>
+                </div>
               </div>
               {session.provider === "demo" && (
                 <div className="demo-note">
@@ -875,72 +932,13 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
                   当前为演示模式，回答仅展示一般性分析框架。
                 </div>
               )}
-              {editing ? (
-                <section className="panel">
-                  <div className="panel-heading">
-                    <div>
-                      <span className="eyebrow">让答案跟上你的想法</span>
-                      <h2>修改本次条件</h2>
-                    </div>
-                    <button
-                      className="icon-button"
-                      type="button"
-                      aria-label="取消修改"
-                      disabled={Boolean(busy)}
-                      onClick={() => setEditing(false)}
-                    >
-                      <X size={19} />
-                    </button>
-                  </div>
-                  <ContextFields
-                    value={context}
-                    onChange={setContext}
-                    fields={[
-                      "topic",
-                      "purpose",
-                      "scenario",
-                      "priorities",
-                      "constraints",
-                    ]}
-                    disabled={Boolean(busy)}
-                  />
-                  <label className="field-label supplement">
-                    还有想补充的内容？
-                    <textarea
-                      value={freeText}
-                      maxLength={2000}
-                      disabled={Boolean(busy)}
-                      onChange={(event) => setFreeText(event.target.value)}
-                      placeholder="补充的原话也会保留在本次问题中"
-                    />
-                  </label>
-                  <div className="panel-actions">
-                    <button
-                      className="text-button"
-                      type="button"
-                      disabled={Boolean(busy)}
-                      onClick={() => setEditing(false)}
-                    >
-                      取消修改
-                    </button>
-                    <button
-                      className="primary"
-                      type="button"
-                      disabled={Boolean(busy)}
-                      onClick={saveContext}
-                    >
-                      保存并确认
-                      <Check size={16} />
-                    </button>
-                  </div>
-                </section>
-              ) : session.stage === "clarifying" && session.clarification ? (
+              {historyAnswer ? null : session.stage === "clarifying" && session.clarification ? (
                 <section className="panel clarification-panel">
                   <div className="panel-heading">
                     <span className="assistant-mark">
                       <Mountain size={21} />
                     </span>
-                    <span className="eyebrow">问山想再了解一点</span>
+                    <span className="eyebrow">探山想再了解一点</span>
                     <span className="round-count">
                       第 {session.clarification_count + 1} / {MAX_CLARIFICATION_ROUNDS} 轮
                     </span>
@@ -1018,15 +1016,6 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
                   <p className="focused-question">{session.focused_question}</p>
                   <div className="panel-actions">
                     <button
-                      className="text-button"
-                      type="button"
-                      onClick={edit}
-                      disabled={Boolean(busy)}
-                    >
-                      <PencilLine size={16} />
-                      修改条件
-                    </button>
-                    <button
                       className="primary"
                       type="button"
                       disabled={Boolean(busy)}
@@ -1079,9 +1068,6 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
                       <RotateCcw size={16} />
                     </button>
                   ) : null}
-                  <button className="text-button" type="button" onClick={edit}>
-                    修改条件
-                  </button>
                 </section>
               ) : session.stage === "error" ? (
                 <section className="panel error-panel" role="alert">
@@ -1089,13 +1075,6 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
                   <h2>这次没能完成回答</h2>
                   <p>{session.error?.message || "你可以稍后手动重试。"}</p>
                   <div className="panel-actions">
-                    <button
-                      className="text-button"
-                      type="button"
-                      onClick={edit}
-                    >
-                      修改条件
-                    </button>
                     <button
                       className="primary"
                       type="button"
@@ -1112,13 +1091,24 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
                   </div>
                 </section>
               ) : null}
-              {currentAnswer && !editing && (
+              {displayedAnswer && (
+                <div id="history-post-results">
                 <AnswerCard
-                  answer={currentAnswer}
-                  stale={false}
-                  onEdit={edit}
+                  key={displayedAnswer.id}
+                  answer={displayedAnswer}
+                  clarificationHistory={displayedAnswer.clarification_history ?? session.clarification_history}
+                  busy={Boolean(busy)}
+                  onEditCondition={editCondition}
+                  onLoadChoices={loadRevisionChoices}
+                  stale={displayedAnswer.context_version !== session.context_version}
                   onFeedback={feedback}
                 />
+                {historyAnswer && historyAnswer.context_version !== session.context_version && (
+                  <button type="button" className="text-button" onClick={() => setHistoryResult(null)}>
+                    返回当前条件，继续提问
+                  </button>
+                )}
+                </div>
               )}
               {oldAnswers.length > 0 && (
                 <details className="previous-answers">
@@ -1130,7 +1120,6 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
                       key={answer.id}
                       answer={answer}
                       stale
-                      onEdit={edit}
                       onFeedback={feedback}
                     />
                   ))}
@@ -1156,6 +1145,33 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
           className="clarification-progress-float"
         />
       )}
+      <dialog
+        ref={deleteDialog}
+        className="about-dialog delete-dialog"
+        aria-labelledby="delete-history-title"
+        aria-describedby="delete-history-description"
+        onClose={() => setDeleteTarget(null)}
+        onClick={(event) => {
+          if (event.target !== event.currentTarget) return;
+          const bounds = event.currentTarget.getBoundingClientRect();
+          if (event.clientX < bounds.left || event.clientX > bounds.right ||
+              event.clientY < bounds.top || event.clientY > bounds.bottom) cancelDelete();
+        }}
+      >
+        <button type="button" className="icon-button dialog-close" aria-label="关闭删除确认" onClick={cancelDelete}>
+          <X size={20} />
+        </button>
+        <span className="brand-icon"><Mountain size={28} aria-hidden="true" /></span>
+        <h2 id="delete-history-title">确认删除这条历史记录？</h2>
+        <p id="delete-history-description">删除后，该问题和已生成的帖子结果将无法恢复。</p>
+        <div className="delete-question">{deleteTarget?.original_question}</div>
+        <div className="delete-dialog-actions">
+          <button autoFocus type="button" className="delete-cancel" onClick={cancelDelete}>取消</button>
+          <button type="button" className="primary" onClick={confirmDelete} disabled={Boolean(busy) || !deleteTarget}>
+            <Trash2 size={16} aria-hidden="true" />确认删除
+          </button>
+        </div>
+      </dialog>
       {about && (
         <div
           className="modal-backdrop"
@@ -1174,7 +1190,7 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
               autoFocus
               className="icon-button dialog-close"
               type="button"
-              aria-label="关闭关于问山"
+              aria-label="关闭关于探山"
               onClick={() => setAbout(false)}
             >
               <X size={20} />
@@ -1184,7 +1200,7 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
             </span>
             <h2 id="about-title">多问一句，答案更近一步。</h2>
             <p>
-              问山根据你的具体问题和补充，判断还需要了解什么。最多追问 {MAX_CLARIFICATION_ROUNDS} 轮，信息足够就开始回答，也可以随时跳过。
+              探山根据你的具体问题和补充，判断还需要了解什么。最多追问 {MAX_CLARIFICATION_ROUNDS} 轮，信息足够就开始回答，也可以随时跳过。
             </p>
             <p>
               连接真实资料后，每次回答会展示可检查的来源。演示模式仅展示交互与一般性分析框架。

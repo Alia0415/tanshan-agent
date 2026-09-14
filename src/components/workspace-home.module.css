@@ -46,8 +46,8 @@
 }
 
 .landingMode .homeLanding {
-  width: min(1180px, calc(100% - 40px));
-  margin: 20px auto 0;
+  width: 100%;
+  margin: 0;
   padding: 0 0 30px;
   transform: none;
 }
@@ -61,7 +61,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: clamp(46px, 6vw, 78px) clamp(22px, 4vw, 54px) 0;
+  padding: calc(clamp(46px, 6vw, 78px) + clamp(44px, 8svh, 96px)) clamp(22px, 4vw, 54px) 0;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -92,30 +92,9 @@
 
 .hero h1 em {
   display: inline-block;
-  margin-left: 0.08em;
-  padding: 0.01em 0.13em 0.06em;
-  border-radius: 10px;
-  background: var(--landing-blue-100);
-  color: var(--landing-blue-950);
-  font-style: italic;
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
-}
-
-.lead {
-  margin: 20px 0 0;
-  color: #374151;
-  font-size: clamp(17px, 1.6vw, 20px);
-  font-weight: 600;
-  line-height: 1.6;
-  letter-spacing: 0.02em;
-}
-
-.supportingCopy {
-  margin: 10px 0 0;
-  color: #697586;
-  font-size: 13px;
-  line-height: 1.8;
+  margin-left: 0.12em;
+  color: var(--landing-blue-800);
+  font-style: normal;
 }
 
 .entries {
@@ -568,8 +547,8 @@
 
 @media (max-width: 1000px) {
   .landingMode .homeLanding {
-    width: calc(100% - 28px);
-    margin-top: 14px;
+    width: 100%;
+    margin: 0;
   }
 
   .landing {
@@ -591,8 +570,8 @@
 
 @media (max-width: 800px) {
   .landingMode .homeLanding {
-    width: calc(100% - 24px);
-    margin: 12px auto 0;
+    width: 100%;
+    margin: 0;
     padding-bottom: 22px;
   }
 
@@ -609,8 +588,8 @@
   }
 
   .landingMode .homeLanding {
-    width: calc(100% - 16px);
-    margin-top: 8px;
+    width: 100%;
+    margin: 0;
   }
 
   .landing {
@@ -626,21 +605,6 @@
   .hero h1 em {
     margin-top: 7px;
     margin-left: 0;
-  }
-
-  .lead {
-  margin: 20px 0 0;
-  color: #374151;
-  font-size: clamp(17px, 1.6vw, 20px);
-  font-weight: 600;
-  line-height: 1.6;
-  letter-spacing: 0.02em;
-}
-
-  .supportingCopy {
-    max-width: 310px;
-    margin-right: auto;
-    margin-left: auto;
   }
 
   .entries {

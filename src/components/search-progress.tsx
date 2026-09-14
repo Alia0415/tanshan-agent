@@ -15,10 +15,15 @@ export function SearchProgress({ searching, disconnected }: { searching: boolean
   }, []);
 
   const current = searching ? 0 : 1;
+  const estimate = disconnected
+    ? "等待重新连接"
+    : elapsed >= 60
+      ? "已超出预计时间，仍在处理中"
+      : "预计需要 30–60 秒（仅供参考）";
   const caption = disconnected
     ? "小山暂时收不到消息了，重新连接后继续查看进展。"
     : elapsed >= 120
-      ? "这次比平时久一些，你可以继续等候，也可以修改条件。"
+      ? "这次比平时久一些，仍在处理中，请再稍等。"
       : elapsed >= 45
         ? "线索还在整理中，谢谢你多给小山一点时间。"
         : searching
@@ -28,7 +33,7 @@ export function SearchProgress({ searching, disconnected }: { searching: boolean
   return (
     <div className={`search-progress${disconnected ? " is-paused" : ""}`}>
       <div className="search-progress-meta">
-        <span>{disconnected ? "等待重新连接" : "小山正在努力中"}</span>
+        <span>{estimate}</span>
         <span role="timer" aria-live="off">本次已等待 {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")}</span>
       </div>
       <div className="search-progress-track" role="progressbar" aria-label={disconnected ? "连接中断，进度未知" : searching ? "正在寻找资料" : "正在整理答案"}>

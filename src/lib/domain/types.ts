@@ -30,6 +30,19 @@ export interface ClarificationCard {
   selection_mode?: "single" | "multiple";
   placeholder?: string;
 }
+export interface ClarificationResponse {
+  question: string;
+  answer: string;
+  card?: ClarificationCard;
+  selected?: string[];
+  free_text?: string;
+  supplement_index?: number;
+}
+export interface ClarificationRevision {
+  history_index: number;
+  selected: string[];
+  free_text?: string;
+}
 export interface Source {
   id: number;
   content_id: string;
@@ -62,6 +75,9 @@ export interface Answer {
   context_version: number;
   context: Context;
   focused_question: string;
+  condition_tags?: string[];
+  condition_sources?: { label: string; history_index: number }[];
+  clarification_history?: ClarificationResponse[];
   summary: string;
   summary_citations: number[];
   sections: AnswerSection[];
@@ -83,7 +99,7 @@ export interface Session {
   free_text_context: string[];
   focused_question: string;
   clarification?: ClarificationCard;
-  clarification_history?: { question: string; answer: string }[];
+  clarification_history?: ClarificationResponse[];
   answers: Answer[];
   provider: "demo" | "live";
   created_at: string;

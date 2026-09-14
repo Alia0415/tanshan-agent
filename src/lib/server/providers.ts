@@ -214,7 +214,7 @@ export function guidance(session: Session, demo: boolean): Draft {
   };
   return {
     summary: demo
-      ? "这是问山 Agent 的流程演示，尚未查询真实知乎资料。以下展示回答的组织方式。"
+      ? "这是探山 Agent 的流程演示，尚未查询真实知乎资料。以下展示回答的组织方式。"
       : "本次未找到足够相关的资料，暂时无法给出有来源支持的结论。",
     summary_citations: [],
     sections: topics.map((title) => ({

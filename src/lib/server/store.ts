@@ -1,3 +1,4 @@
+import { isZhihuPost } from "../domain/sources";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -7,14 +8,14 @@ import { AppError } from "../domain/validation";
 
 type Row = { data: string; owner: string; expires: number };
 const state = globalThis as unknown as {
-  wenshanDb?: DatabaseSync;
-  wenshanCleanup?: NodeJS.Timeout;
+  tanshanDb?: DatabaseSync;
+  tanshanCleanup?: NodeJS.Timeout;
 };
 export const ownerHash = (token: string) =>
   createHash("sha256").update(token).digest("hex");
 
 export function db() {
-  if (state.wenshanDb) return state.wenshanDb;
+  if (state.tanshanDb) return state.tanshanDb;
   // The database is created at runtime; never trace local data or environment files into the build.
   const path = resolve(
     /* turbopackIgnore: true */ process.env.WENSHAN_DB_PATH ||
@@ -41,7 +42,7 @@ export function db() {
       PRIMARY KEY(session_id, answer_id)
     );
   `);
-  state.wenshanDb = connection;
+  state.tanshanDb = connection;
   // Recovery is explicit: a new process never replays a paid POST from an old process.
   const interrupted = connection
     .prepare(
@@ -67,13 +68,13 @@ export function db() {
     )
     .run();
   cleanup();
-  state.wenshanCleanup = setInterval(cleanup, 60_000);
-  state.wenshanCleanup.unref();
+  state.tanshanCleanup = setInterval(cleanup, 60_000);
+  state.tanshanCleanup.unref();
   return connection;
 }
 
 export function cleanup() {
-  state.wenshanDb
+  state.tanshanDb
     ?.prepare("DELETE FROM sessions WHERE expires <= ?")
     .run(Date.now());
 }
@@ -104,7 +105,7 @@ export function listSessions(token: string): SessionSummary[] {
   const rows = db().prepare("SELECT data FROM sessions WHERE owner = ? AND expires > ?")
     .all(ownerHash(token), Date.now()) as { data: string }[];
   return rows.map((row) => JSON.parse(row.data) as Session)
-    .filter((session) => session.schema_version === 2)
+    .filter((session) => session.schema_version === 2 && session.answers.some((answer) => answer.sources.some(isZhihuPost)))
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .map(({ session_id, original_question, stage, created_at }) => ({
       session_id, original_question, stage, created_at,
@@ -163,4 +164,11 @@ export function transaction<T>(operation: () => T): T {
     connection.exec("ROLLBACK");
     throw error;
   }
+}
+
+export function deleteSession(id: string, token: string) {
+  const result = db().prepare("DELETE FROM sessions WHERE id = ? AND owner = ?")
+    .run(id, ownerHash(token));
+  if (!result.changes)
+    throw new AppError("SESSION_NOT_FOUND", "记录已删除或无法访问。", 404);
 }
