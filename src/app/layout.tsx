@@ -1,3 +1,4 @@
+import { ZhihuAccountProvider } from "@/components/zhihu-account";
 import type { Metadata } from "next";
 import "./globals.css";
 import { MobileTabbar } from "@/components/mobile-tabbar";
@@ -15,7 +16,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN">
-      <body><BookmarkProvider><ProductNav />{children}<MobileTabbar /></BookmarkProvider></body>
+      <body><BookmarkProvider><ZhihuAccountProvider><ProductNav />{children}<MobileTabbar /></ZhihuAccountProvider></BookmarkProvider></body>
     </html>
   );
 }

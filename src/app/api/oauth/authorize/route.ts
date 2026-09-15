@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { identity } from "@/lib/server/http";
-import { buildAuthorizeUrl, oauthConfig } from "@/lib/server/oauth";
+import { buildAuthorizeUrl, createOAuthState, oauthConfig } from "@/lib/server/oauth";
 
 export const runtime = "nodejs";
 
@@ -11,7 +11,9 @@ export async function GET() {
       status: 307,
       headers: { Location: "/me?oauth=not-configured" },
     });
-  // state 使用访客令牌：回调时校验同一浏览器，防串号。
+  // 每次授权生成独立、短期、一次性的 state。
   const visitor = await identity(true);
-  return NextResponse.redirect(buildAuthorizeUrl(config, visitor));
+  const response = NextResponse.redirect(buildAuthorizeUrl(config, createOAuthState(visitor)));
+  response.headers.set("Cache-Control", "no-store");
+  return response;
 }

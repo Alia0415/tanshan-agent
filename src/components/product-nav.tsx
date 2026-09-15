@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { ZhihuAccountButton } from "./zhihu-account";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -74,6 +75,7 @@ export function ProductNav() {
           {item.label}
         </Link>
       ))}
+      <ZhihuAccountButton />
     </nav>
   );
 }

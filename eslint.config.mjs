@@ -5,5 +5,5 @@ export default defineConfig([
   ...nextVitals,
   ...nextTs,
   // public/lumora holds a prebuilt Vite bundle (easter-egg page), not source.
-  globalIgnores([".next/**", "next-env.d.ts", "prototype/**", "public/lumora/**"]),
+  globalIgnores([".next/**", ".next-*/**", ".data/**", "next-env.d.ts", "prototype/**", "public/lumora/**"]),
 ]);

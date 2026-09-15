@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const config: NextConfig = {
   devIndicators: false,
+  distDir: process.env.WENSHAN_BUILD_DIR || ".next",
   // The OAuth callback is registered for http://127.0.0.1, so dev is served
   // there; Next only trusts localhost for /_next dev resources by default.
   // WENSHAN_DEV_ORIGINS adds LAN hosts (comma separated) for phone testing.
