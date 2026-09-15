@@ -1,7 +1,8 @@
 "use client";
-
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
+import { PercentageProgress } from "@/components/percentage-progress";
+import { readGenerationStream } from "@/lib/reading/generation-stream";
 import type { Question } from "@/lib/reading/discovery";
 import { BookmarkButton } from "@/components/bookmarks";
 import { ParticleField } from "./particle-field";
@@ -98,6 +99,7 @@ function RouteIcon() {
 
 export default function QuestionReader({ question }: { question: Question }) {
   const assistantEnabled = Boolean(question.firstSeenHot);
+  const mapStorageKey = `tanshan-reading-map:${question.id}`;
   const [stage, setStage] = useState<Stage>("entry");
   const [questionIndex, setQuestionIndex] = useState(0);
   const [clarifyQuestion, setClarifyQuestion] = useState<ClarifyQuestion | null>(null);
@@ -111,16 +113,23 @@ export default function QuestionReader({ question }: { question: Question }) {
   const [mindMapLoadingIds, setMindMapLoadingIds] = useState<Set<string>>(new Set());
   const [mindMapErrors, setMindMapErrors] = useState<Record<string, string>>({});
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [generationLabel, setGenerationLabel] = useState("正在准备材料");
+  const [generationSeconds, setGenerationSeconds] = useState(0);
+  const generationRequest = useRef<AbortController | null>(null);
   const [apiError, setApiError] = useState("");
   const [furthestStop, setFurthestStop] = useState(0);
   const [focusedCategoryId, setFocusedCategoryId] = useState("");
+  const categoryAsideRef = useRef<HTMLDivElement>(null);
   const selectedCategory = categories.find((category) => category.id === selectedCategoryId) ?? categories[0];
+  const selectedCategoryIndex = categories.findIndex(category => category.id === selectedCategory?.id);
+  const nextCategory = categories[selectedCategoryIndex + 1];
   const selectedPostKey = selectedPost ? (selectedPost.contentId || selectedPost.url) : "";
   const selectedMindMap = selectedPostKey ? postMindMaps[selectedPostKey] : undefined;
   const focusedCategoryIndex = categories.findIndex((category) => category.id === focusedCategoryId);
   const focusedCategory = focusedCategoryIndex >= 0 ? categories[focusedCategoryIndex] : undefined;
   const focusedPosition = focusedCategory ? stationPos(focusedCategoryIndex, categories.length) : undefined;
-  const routeProgress = categories.length > 1 ? 8 + (84 * furthestStop) / (categories.length - 1) : categories.length ? 8 : 0;
+  const routeProgress = categories.length > 1 ? 8 + (84 * Math.max(0, selectedCategoryIndex)) / (categories.length - 1) : categories.length ? 8 : 0;
 
   useEffect(() => {
     if (!focusedCategoryId) return;
@@ -130,6 +139,38 @@ export default function QuestionReader({ question }: { question: Question }) {
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [focusedCategoryId]);
+
+  useEffect(() => () => generationRequest.current?.abort(), []);
+  useEffect(() => {
+    try {
+      const saved = window.sessionStorage.getItem(mapStorageKey);
+      if (!saved) return;
+      const snapshot = JSON.parse(saved) as { categories?: Category[]; selectedCategoryId?: string; furthestStop?: number; history?: ReadingTurn[] };
+      if (!Array.isArray(snapshot.categories)) return;
+      const readable = snapshot.categories.filter(category => category && typeof category.id === "string" && Array.isArray(category.posts) && category.posts.length > 0);
+      if (!readable.length) return;
+      setCategories(readable);
+      setSelectedCategoryId(readable.some(category => category.id === snapshot.selectedCategoryId) ? snapshot.selectedCategoryId! : readable[0].id);
+      setFurthestStop(Number.isInteger(snapshot.furthestStop) ? Math.max(0, Math.min(readable.length - 1, snapshot.furthestStop!)) : 0);
+      if (Array.isArray(snapshot.history)) setHistory(snapshot.history);
+      setStage("map");
+    } catch { /* 会话存储不可用时仍可正常阅读 */ }
+  }, [mapStorageKey]);
+
+  useEffect(() => {
+    if (stage !== "map" || !categories.length) return;
+    try { window.sessionStorage.setItem(mapStorageKey, JSON.stringify({ categories, selectedCategoryId, furthestStop, history })); }
+    catch { /* 会话存储不可用时不影响当前页面 */ }
+  }, [mapStorageKey, stage, categories, selectedCategoryId, furthestStop, history]);
+  function selectCategory(index: number, toggle = false) {
+    const category = categories[index];
+    if (!category) return;
+    setSelectedCategoryId(category.id);
+    setFocusedCategoryId(previous => toggle && previous === category.id ? "" : category.id);
+    setSelectedPost(null);
+    setFurthestStop(previous => Math.max(previous, index));
+    categoryAsideRef.current?.scrollTo({ top: 0, behavior: "instant" });
+  }
 
   async function loadPostMindMap(post: Post, force = false) {
     const key = post.contentId || post.url;
@@ -209,6 +250,16 @@ export default function QuestionReader({ question }: { question: Question }) {
   }
 
   async function generateMap() {
+    setFocusedCategoryId("");
+    if (generationRequest.current) return;
+    const controller = new AbortController();
+    generationRequest.current = controller;
+    const startedAt = Date.now();
+    setGenerationSeconds(0);
+    setGenerationProgress(0);
+    setGenerationLabel("正在准备材料");
+    const timer = window.setInterval(() => setGenerationSeconds(Math.floor((Date.now() - startedAt) / 1000)), 1000);
+    const timeout = window.setTimeout(() => controller.abort("timeout"), 600000);
     setIsGenerating(true);
     setApiError("");
     setSelectedPost(null);
@@ -216,26 +267,36 @@ export default function QuestionReader({ question }: { question: Question }) {
     try {
       const response = await fetch("/api/reading/reading-map", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
         body: JSON.stringify({
           questionId: question.id,
           history,
         }),
       });
-      const result = await response.json() as ReadingMapResult & { error?: string };
+      const result = await readGenerationStream<ReadingMapResult & { error?: string }>(response, (percent, label) => { setGenerationProgress(percent); setGenerationLabel(label); });
+      if (controller.signal.aborted) return;
       if (!response.ok) throw new Error(result.error || "真实内容整理失败，请重试。");
-      setCategories(result.categories);
-      setSelectedCategoryId(result.categories[0]?.id ?? "");
+      const readableCategories = result.categories.filter(category => category.posts.length > 0);
+      if (!readableCategories.length) throw new Error("暂未找到足够的相关文章，请重新生成。");
+      setCategories(readableCategories);
+      setSelectedCategoryId(readableCategories[0].id);
       setFurthestStop(0);
       setStage("map");
     } catch (error) {
-      setApiError(error instanceof Error ? error.message : "真实内容整理失败，请重试。");
+      setApiError(controller.signal.aborted
+        ? controller.signal.reason === "timeout" ? "等待时间过长，请点击重新生成。你的关注点已保留。" : "已停止等待，你可以重新生成。"
+        : error instanceof Error ? error.message : "真实内容整理失败，请重试。");
     } finally {
+      window.clearInterval(timer);
+      window.clearTimeout(timeout);
+      generationRequest.current = null;
       setIsGenerating(false);
     }
   }
 
   function resetSession() {
+    try { window.sessionStorage.removeItem(mapStorageKey); } catch { /* 会话存储不可用 */ }
     setHistory([]);
     setClarifyQuestion(null);
     setSelectedAnswer("");
@@ -319,6 +380,16 @@ export default function QuestionReader({ question }: { question: Question }) {
                   {history.length ? history.map((turn, index) => <li key={index}>{turn.answer}</li>) : <li>了解主要观点</li>}
                 </ul>
 
+                {isGenerating && (
+                  <div className="map-generation" aria-busy="true">
+                    <div className="map-generation-heading">
+                      <strong role="status">正在为你生成阅读地图</strong>
+                    </div>
+                    <PercentageProgress value={generationProgress} label={generationLabel} />
+                    <p>{generationSeconds >= 60 ? "本次整理耗时较长，仍在等待结果。你可以继续等待，也可以停止等待后重试。" : "将根据你的关注点规划分类、检索知乎内容并筛选文章，完成后自动展示地图。"}</p>
+                    <button className="text-button" type="button" onClick={() => generationRequest.current?.abort()}>停止等待</button>
+                  </div>
+                )}
                 <div className="panel-actions summary-actions">
                   <button className="secondary-button" type="button" disabled={isGenerating} onClick={restartFocusQuestions}>修改关注点</button>
                   <button className="primary-button" type="button" disabled={isGenerating} onClick={generateMap}>{isGenerating ? "正在生成分类并检索…" : "生成阅读地图"}</button>
@@ -337,36 +408,32 @@ export default function QuestionReader({ question }: { question: Question }) {
                         <path d={SKY_TRAIL} className="sky-path" pathLength="100" />
                         <path d={SKY_TRAIL} className="sky-path-progress" pathLength="100" style={{ strokeDashoffset: 100 - routeProgress }} />
                       </svg>
-                      <div className="sky-progress" aria-hidden="true"><span>已走到第 {furthestStop + 1} 站</span></div>
+                      <div className="sky-progress" aria-hidden="true"><span>阅读路线</span><strong>第 {selectedCategoryIndex + 1} / {categories.length} 站</strong></div>
                       {categories.map((category, index) => {
                         const pos = stationPos(index, categories.length);
                         const selected = selectedCategory?.id === category.id;
                         const visited = index <= furthestStop;
                         return (
-                          <div
+                          <button
                             key={category.id}
-                            className={`sky-station-group${focusedCategoryId === category.id ? " orbit-center" : ""}`}
+                            type="button"
+                            draggable={false}
+                            onDragStart={(event) => event.preventDefault()}
+                            className={`sky-station${selected ? " current" : ""}${visited ? " visited" : ""}${focusedCategoryId === category.id ? " orbit-center" : ""}${index >= categories.length / 2 ? " preview-left" : " preview-right"}`}
                             style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
+                            onMouseDown={(event) => { if (event.button === 0) selectCategory(index, true); }}
+                            onPointerUp={(event) => { if (event.isPrimary && event.pointerType !== "mouse") selectCategory(index, true); }}
+                            onClick={(event) => { if (event.detail === 0) selectCategory(index, true); }}
+                            aria-expanded={focusedCategoryId === category.id}
+                            aria-pressed={selected}
+                            aria-label={`第 ${index + 1} 站，${category.phase}`}
                           >
-                            <button
-                              type="button"
-                              draggable={false}
-                              onDragStart={(event) => event.preventDefault()}
-                              className={`sky-station${selected ? " current" : ""}${visited ? " visited" : ""}`}
-                              onClick={() => {
-                                setSelectedCategoryId(category.id);
-                                setSelectedPost(null);
-                                setFurthestStop((previous) => Math.max(previous, index));
-                                setFocusedCategoryId((current) => current === category.id ? "" : category.id);
-                              }}
-                              aria-pressed={selected}
-                              aria-expanded={focusedCategoryId === category.id}
-                              aria-label={`第 ${index + 1} 站，${category.phase}`}
-                            >
-                              <span className="sky-dot"><b>{String(index + 1).padStart(2, "0")}</b></span>
-                            </button>
-                            <span className="sky-tag" aria-hidden="true"><strong>{category.phase}</strong></span>
-                          </div>
+                            <span className="sky-dot"><b>{String(index + 1).padStart(2, "0")}</b></span>
+                            <span className="sky-tag">
+                              <strong>{category.phase}</strong>
+                            </span>
+                            <span className="sky-preview" aria-hidden="true"><small>第 {index + 1} 站 · {category.posts.length} 篇</small><b>{category.title}</b><span>{category.summary || category.reason}</span></span>
+                          </button>
                         );
                       })}
                       {focusedCategory && focusedPosition && (
@@ -386,7 +453,7 @@ export default function QuestionReader({ question }: { question: Question }) {
                                 "--orbit-y": `${placement.y}px`,
                                 "--orbit-angle": `${placement.angle}deg`,
                                 "--orbit-length": `${placement.length}px`,
-                                "--orbit-delay": `${index * 0.12}s`,
+                                "--orbit-delay": `${index * 0.07}s`,
                                 "--orbit-drift-delay": `${index * -1.7}s`,
                               } as CSSProperties;
                               return (
@@ -425,7 +492,7 @@ export default function QuestionReader({ question }: { question: Question }) {
                           </div>
                           <strong>{selectedCategory.posts.length}<small>篇</small></strong>
                         </header>
-                        <div className="category-post-list" role="list">
+                        <div ref={categoryAsideRef} className="category-post-list" role="list">
                           {selectedCategory.posts.map((post, index) => (
                             <article className="category-post-row" key={post.contentId} role="listitem">
                               <button type="button" onClick={() => openPost(post)} aria-label={`查看帖子：${post.title}`}>
@@ -442,6 +509,11 @@ export default function QuestionReader({ question }: { question: Question }) {
                         </div>
                       </section>
                     )}
+                    {selectedCategory && <nav className="category-navigation" aria-label="阅读阶段导航">
+                      <span role="status">第 {selectedCategoryIndex + 1} / {categories.length} 阶段</span>
+                      <div><button type="button" disabled={selectedCategoryIndex <= 0} onClick={() => selectCategory(selectedCategoryIndex - 1)}>上一步</button>
+                      <button className="category-next" type="button" disabled={!nextCategory} onClick={() => selectCategory(selectedCategoryIndex + 1)}>{nextCategory ? "下一步 →" : "已到最后阶段"}</button></div>
+                    </nav>}
                   </aside>
                 </div>
 
