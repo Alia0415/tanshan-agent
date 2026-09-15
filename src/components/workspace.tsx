@@ -97,8 +97,8 @@ const examples = [
 const emptyContext = (): Context => ({ priorities: [] });
 // Easter egg: typing this code in the question box opens the standalone
 // Lumora page shipped in public/lumora (its 返回 button comes back here).
-const EASTER_EGG = { code: "114514", href: "/lumora" };
-const isEasterEgg = (value: string) => value.trim() === EASTER_EGG.code;
+const EASTER_EGG = { codes: ["114514", "20260821"], href: "/lumora" };
+const isEasterEgg = (value: string) => EASTER_EGG.codes.includes(value.trim());
 // The target is a static page outside the app router, so it needs a full navigation.
 const openEasterEgg = () =>
   window.location.assign(new URL(EASTER_EGG.href, window.location.origin));
