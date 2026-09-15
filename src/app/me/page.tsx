@@ -1,211 +1,96 @@
 "use client";
-
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import { ArrowRight, CheckCircle2, LogOut, Mountain, ShieldCheck } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { LogOut, ArrowRight } from "lucide-react";
+import { useZhihuAccount, ZhihuAvatar } from "@/components/zhihu-account";
+import { safeWebUrl } from "@/lib/domain/zhihu-user";
 
-type Status = {
-  configured: boolean;
-  appId: string | null;
-  appKeyConfigured: boolean;
-  redirectUri: string | null;
-  loggedIn: boolean;
-  expiresIn: number;
-};
+type Item = { Url?: string; Title?: string; Fullname?: string; AvatarUrl?: string; Headline?: string; Summary?: string; Description?: string; ContentType?: string; LikeCount?: number; FollowerCount?: number; CreatedAt?: number };
+type Section = "contents" | "followees" | "favlists" | "collections";
+const sections: { key: Section; label: string }[] = [{ key: "contents", label: "我的创作" }, { key: "followees", label: "我的关注" }, { key: "favlists", label: "收藏夹" }, { key: "collections", label: "近期收藏" }];
+const types: Record<string, string> = { answer: "回答", article: "文章", question: "问题", pin: "想法", zvideo: "视频" };
+const messages: Record<string, string> = { ok: "知乎登录成功。", "missing-code": "未完成知乎授权，请重新登录。", "state-mismatch": "登录请求已失效，请重新登录。", "token-failed": "知乎登录未完成，请重试。", "not-configured": "知乎登录暂未开放，请稍后再试。" };
 
-const OAuthMessages: Record<string, string> = {
-  ok: "知乎授权成功，可以查看你的创作、关注与收藏了。",
-  "missing-code": "知乎没有返回授权码，请重新发起登录。",
-  "state-mismatch": "登录状态校验失败，请在同一浏览器重试。",
-  "token-failed": "换取授权失败，请重新发起登录。",
-  "not-configured": "服务端尚未配置 App ID / App Key / 回调地址。",
-};
-
-function formatRemaining(seconds: number) {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  return hours > 0 ? `${hours} 小时 ${minutes} 分钟` : `${minutes} 分钟`;
-}
-
-// This page only talks to its own /api routes; any other target is refused before fetch.
-function sameOriginApi(path: string) {
-  if (!/^\/api\/[\w\-./]+(\?[\w\-.=&%]*)?$/.test(path)) throw new Error("非法的接口路径");
-  return path;
-}
-
-export default function MePage() {
-  const [status, setStatus] = useState<Status | null>(null);
-  const [notice, setNotice] = useState("");
-  const [section, setSection] = useState<string>("");
-  const [items, setItems] = useState<unknown[]>([]);
+function UserContent({ onExpired }: { onExpired: () => void }) {
+  const [section, setSection] = useState<Section>("contents");
+  const [items, setItems] = useState<Item[]>([]);
+  const [next, setNext] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    const oauth = new URLSearchParams(window.location.search).get("oauth");
-    fetch(sameOriginApi("/api/oauth/status"), { cache: "no-store" })
-      .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error?.message || "读取状态失败");
-        return data as Status;
-      })
-      .then(setStatus)
-      .catch((cause: Error) => setNotice(cause.message))
-      .finally(() => {
-        if (oauth) setNotice(OAuthMessages[oauth] ?? "");
-      });
-  }, []);
-
-  const load = useCallback(async (key: string, path: string) => {
-    setLoading(true);
-    setError("");
-    setSection(key);
-    setItems([]);
+  const active = useRef<AbortController | null>(null);
+  const inFlight = useRef(false);
+  const load = useCallback(async (key: Section, offset = "0", append = false) => {
+    if (append && inFlight.current) return;
+    active.current?.abort();
+    const controller = new AbortController(); active.current = controller;
+    inFlight.current = true; setLoading(true); setError("");
+    if (!append) { setSection(key); setItems([]); setNext(null); setLoaded(false); }
     try {
-      const response = await fetch(sameOriginApi(path), { cache: "no-store" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error?.message || "读取失败");
-      const payload = data.Data ?? data;
-      setItems(Array.isArray(payload) ? payload : payload.Items ?? []);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "读取失败");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+      const params = new URLSearchParams({ Limit: "20", Offset: offset });
+      const response = await fetch("/api/me/" + key + "?" + params, { cache: "no-store", signal: controller.signal });
+      const result = await response.json();
+      if (!response.ok || result.Code !== 0) {
+        if (response.status === 401) onExpired();
+        throw new Error(result.error?.message || "读取失败，请稍后重试。");
+      }
+      if (!Array.isArray(result.Data?.Items)) throw new Error("返回内容格式异常，请稍后重试。");
+      const page = result.Data.Paging;
+      let cursor: string | null = null;
+      if ((key === "contents" || key === "followees") && page?.IsEnd === false) {
+        if (typeof page.NextOffset !== "string" || !/^\d+$/.test(page.NextOffset) || BigInt(page.NextOffset) > 9223372036854775807n || BigInt(page.NextOffset) <= BigInt(offset)) throw new Error("分页信息异常，请稍后重试。");
+        cursor = page.NextOffset;
+      } else if ((key === "contents" || key === "followees") && page?.IsEnd !== true) throw new Error("分页信息缺失，请稍后重试。");
+      if (controller.signal.aborted) return;
+      setItems((previous) => append ? [...previous, ...result.Data.Items.filter((item: Item) => !item.Url || !previous.some((old) => old.Url === item.Url))] : result.Data.Items);
+      setNext(cursor); setLoaded(true);
+    } catch (cause) { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "读取失败"); }
+    finally { if (!controller.signal.aborted) { inFlight.current = false; setLoading(false); } }
+  }, [onExpired]);
+  useEffect(() => { const timer = setTimeout(() => void load("contents"), 0); return () => { clearTimeout(timer); active.current?.abort(); }; }, [load]); // Initial page only; tabs and pagination are explicit user actions.
+  return <section className="me-card me-sections" aria-label="我的知乎内容">
+    <div className="me-tabs" role="tablist" aria-label="内容类型">{sections.map(({ key, label }) => <button id={"tab-" + key} role="tab" aria-selected={section === key} aria-controls="user-content" className={section === key ? "on" : ""} key={key} onClick={() => void load(key)}>{label}</button>)}</div>
+    <div id="user-content" role="tabpanel" aria-labelledby={"tab-" + section} aria-busy={loading}>
+      {section === "collections" && <p className="me-empty">展示近期收藏，不代表全部收藏记录。</p>}
+      <ul className="me-list">{items.map((item, index) => {
+        const title = item.Title || item.Fullname || "未命名内容";
+        const url = safeWebUrl(item.Url);
+        return <li key={(item.Url || title) + index} className="me-content-item">
+          {section === "followees" && <ZhihuAvatar src={item.AvatarUrl} name={title} />}
+          <div className="me-content-text">{url ? <a href={url} target="_blank" rel="noreferrer">{title}</a> : <strong>{title}</strong>}
+            <p>{item.Summary || item.Headline || item.Description || ""}</p>
+            <small>{[item.ContentType ? types[item.ContentType] || "创作" : "", typeof item.LikeCount === "number" ? item.LikeCount + " 赞" : "", typeof item.FollowerCount === "number" ? item.FollowerCount + " 粉丝" : ""].filter(Boolean).join(" · ")}</small>
+          </div>
+        </li>;
+      })}</ul>
+      {error && <p className="me-notice" role="alert">{error} <button className="me-ghost" disabled={loading} onClick={() => void load(section, next || "0", loaded && next !== null)}>重试</button></p>}
+      <div aria-live="polite">{loading && <p className="me-empty">正在读取…</p>}{!loading && loaded && items.length === 0 && !error && <p className="me-empty">暂时没有可展示的公开内容。</p>}</div>
+      {next && !error && <button className="me-ghost me-load-more" disabled={loading} onClick={() => void load(section, next, true)}>{loading ? "加载中…" : "加载更多"}</button>}
+      {loaded && !next && items.length > 0 && !error && <p className="me-empty">已显示全部可用内容</p>}
+    </div>
+  </section>;
+}
+export default function MePage() {
+  const { status, error, refresh } = useZhihuAccount();
+  const [notice, setNotice] = useState("");
+  const [loggingOut, setLoggingOut] = useState(false);
+  useEffect(() => { const timer = setTimeout(() => { const value = new URLSearchParams(window.location.search).get("oauth"); if (value) { setNotice(messages[value] || ""); window.history.replaceState(null, "", "/me"); } }, 0); return () => clearTimeout(timer); }, []);
+  const onExpired = useCallback(() => { setNotice("知乎授权已失效，请重新登录。"); void refresh(); }, [refresh]);
   async function logout() {
-    await fetch(sameOriginApi("/api/oauth/logout"), { method: "POST" }).catch(() => {});
-    setStatus((previous) => (previous ? { ...previous, loggedIn: false } : previous));
-    setNotice("已退出知乎登录。");
-    setSection("");
-    setItems([]);
+    setLoggingOut(true);
+    try { const response = await fetch("/api/oauth/logout", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); if (!response.ok) throw new Error(); await refresh(); setNotice("已退出知乎登录。"); }
+    catch { setNotice("退出失败，请重试。"); } finally { setLoggingOut(false); }
   }
-
-  const loggedIn = status?.loggedIn ?? false;
-
-  return (
-    <main className="me-page">
-      <div className="me-card me-head">
-        <Link className="me-brand" href="/">
-          <Mountain size={18} aria-hidden="true" />
-          探山
-        </Link>
-        <h1>我的知乎</h1><Link href="/?bookmarks=1">我的探山收藏夹 →</Link>
-        <p>
-          用知乎账号登录后，可以在这里查看你授权范围内的创作、关注与收藏。
-          凭证只保存在服务端，24 小时内有效。
-        </p>
-        {notice && (
-          <p className={notice.includes("成功") ? "me-notice ok" : "me-notice"}>
-            {notice}
-          </p>
-        )}
-        <div className="me-actions">
-          {!loggedIn ? (
-            <a className="me-primary" href="/api/oauth/authorize">
-              登录知乎账号
-              <ArrowRight size={15} aria-hidden="true" />
-            </a>
-          ) : (
-            <>
-              <span className="me-badge">
-                <CheckCircle2 size={14} aria-hidden="true" />
-                已登录 · 剩余 {formatRemaining(status?.expiresIn ?? 0)}
-              </span>
-              <button type="button" className="me-ghost" onClick={() => void logout()}>
-                <LogOut size={14} aria-hidden="true" />
-                退出登录
-              </button>
-            </>
-          )}
-        </div>
-        {status && !status.configured && (
-          <p className="me-notice">
-            <ShieldCheck size={13} aria-hidden="true" />
-            服务端缺少 App ID / App Key / 回调地址配置，真实登录需先部署并登记回调。
-          </p>
-        )}
-      </div>
-
-      <div className="me-card me-sections">
-        <h2>授权内容</h2>
-        <div className="me-tabs">
-          <button
-            type="button"
-            className={section === "contents" ? "on" : ""}
-            disabled={!loggedIn || loading}
-            onClick={() => void load("contents", "/api/me/contents?Limit=20")}
-          >
-            我的创作
-          </button>
-          <button
-            type="button"
-            className={section === "followees" ? "on" : ""}
-            disabled={!loggedIn || loading}
-            onClick={() => void load("followees", "/api/me/followees?Limit=20")}
-          >
-            我的关注
-          </button>
-          <button
-            type="button"
-            className={section === "favlists" ? "on" : ""}
-            disabled={!loggedIn || loading}
-            onClick={() => void load("favlists", "/api/me/favlists?Limit=20")}
-          >
-            收藏夹
-          </button>
-          <button
-            type="button"
-            className={section === "collections" ? "on" : ""}
-            disabled={!loggedIn || loading}
-            onClick={() => void load("collections", "/api/me/collections?Limit=20")}
-          >
-            近期收藏
-          </button>
-        </div>
-        {!loggedIn && <p className="me-empty">登录后这里会展示你的知乎内容。</p>}
-        {loading && <p className="me-empty">正在读取…</p>}
-        {error && <p className="me-empty me-error">{error}</p>}
-        {!loading && !error && items.length > 0 && (
-          <ul className="me-list">
-            {items.map((item, index) => {
-              const record = item as Record<string, unknown>;
-              const title =
-                (record.Title as string) ||
-                (record.Fullname as string) ||
-                "（无标题）";
-              const url = (record.Url as string) || "";
-              const meta = [
-                typeof record.LikeCount === "number" ? `${record.LikeCount} 赞` : "",
-                typeof record.FollowerCount === "number"
-                  ? `${record.FollowerCount} 粉丝`
-                  : "",
-                typeof record.ContentType === "string"
-                  ? String(record.ContentType)
-                  : "",
-              ]
-                .filter(Boolean)
-                .join(" · ");
-              return (
-                <li key={index}>
-                  {url ? (
-                    <a href={url} target="_blank" rel="noreferrer">
-                      {title}
-                    </a>
-                  ) : (
-                    <span>{title}</span>
-                  )}
-                  {meta && <small>{meta}</small>}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        {!loading && !error && items.length === 0 && section && (
-          <p className="me-empty">这部分暂时没有公开内容。</p>
-        )}
-      </div>
-    </main>
-  );
+  const user = status?.user;
+  return <main className="me-page">
+    <section className="me-card me-head">
+      <Link className="me-brand" href="/">探山 · 个人中心</Link>
+      {status?.loggedIn && user ? <><div className="me-profile"><ZhihuAvatar key={user.avatar} src={user.avatar} name={user.name} large /><div><h1>{user.name}</h1><p>{user.headline || "欢迎来到你的知乎空间"}</p></div></div>{user.description && <p className="me-description">{user.description}</p>}
+      <div className="me-actions"><span className="me-badge">知乎已连接</span><button className="me-ghost" disabled={loggingOut} onClick={() => void logout()}><LogOut size={14} />{loggingOut ? "退出中…" : "退出登录"}</button></div></> : <><h1>我的知乎</h1><p>连接知乎账号，在这里查看你的个人资料、创作和关注。</p><div className="me-actions">{status?.configured ? <a className="me-primary" href="/api/oauth/authorize">使用知乎登录 <ArrowRight size={15} /></a> : <span className="me-empty">{status ? "知乎登录暂未开放" : "正在读取登录状态…"}</span>}</div></>}
+      {notice && <p className="me-notice" role="status">{notice}</p>}
+      {error && <p role="alert" className="me-notice">{error}<button className="me-ghost" onClick={() => void refresh()}>重试</button></p>}
+      <Link className="me-bookmarks-link" href="/?bookmarks=1">我的探山收藏夹 →</Link>
+    </section>
+    {status?.loggedIn && user && <UserContent key={user.id} onExpired={onExpired} />}
+  </main>;
 }

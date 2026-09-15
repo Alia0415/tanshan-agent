@@ -1,5 +1,5 @@
 import { identity } from "@/lib/server/http";
-import { exchangeToken, saveOAuthSession } from "@/lib/server/oauth";
+import { consumeOAuthState, exchangeToken, fetchUserProfile, saveOAuthSession } from "@/lib/server/oauth";
 
 export const runtime = "nodejs";
 
@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 // request.url may be rebuilt as localhost in dev, and 127.0.0.1 / localhost
 // carry separate visitor cookies.
 const home = (query: string) =>
-  new Response(null, { status: 307, headers: { Location: "/me?oauth=" + query } });
+  new Response(null, { status: 307, headers: { Location: "/me?oauth=" + query, "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } });
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -18,9 +18,10 @@ export async function GET(request: Request) {
   if (!code) return home("missing-code");
   try {
     const visitor = await identity();
-    if (state && state !== visitor) return home("state-mismatch");
+    if (!consumeOAuthState(visitor, state)) return home("state-mismatch");
     const token = await exchangeToken(code);
-    saveOAuthSession(visitor, token.accessToken, token.expiresIn);
+    const profile = await fetchUserProfile(token.accessToken);
+    saveOAuthSession(visitor, token.accessToken, token.expiresIn, profile);
     return home("ok");
   } catch {
     // 换取失败不给用户暴露细节，回到登录页重试。

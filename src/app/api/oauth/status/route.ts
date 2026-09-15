@@ -8,11 +8,13 @@ export async function GET() {
     const config = oauthConfig();
     let loggedIn = false;
     let expiresIn = 0;
+    let user: import("@/lib/domain/zhihu-user").ZhihuUser | null = null;
     try {
       const visitor = await identity();
       const session = getOAuthSession(visitor);
       if (session) {
         loggedIn = true;
+        user = session.user;
         expiresIn = Math.max(
           0,
           Math.floor((session.expiresAt - Date.now()) / 1000),
@@ -29,6 +31,7 @@ export async function GET() {
       redirectUri: config.redirectUri || null,
       loggedIn,
       expiresIn,
+      user,
     };
   });
 }

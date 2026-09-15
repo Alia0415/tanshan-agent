@@ -2958,3 +2958,31 @@ dialog.delete-dialog { position: fixed; inset: 0; margin: auto; width: 470px; ma
   .product-nav { display: none; }
   .header-nav .nav-about { display: none; }
 }
+
+/* Zhihu account and profile */
+.product-nav .zhihu-account { margin-left:auto; display:inline-flex; align-items:center; gap:8px; flex-shrink:0; color:var(--ink); border:1px solid var(--line); background:var(--surface); padding:5px 12px; min-height:38px; }
+.zhihu-account-name { max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.zhihu-avatar { width:30px; height:30px; display:inline-flex; flex-shrink:0; align-items:center; justify-content:center; overflow:hidden; border-radius:50%; color:#056de8; background:#edf5ff; font-weight:600; }
+.zhihu-avatar img { width:100%; height:100%; object-fit:cover; }
+.zhihu-avatar--large { width:80px; height:80px; font-size:30px; }
+.me-page { align-content:start; }
+.me-profile { display:flex; align-items:center; gap:20px; margin:16px 0; }
+.me-profile h1 { overflow-wrap:anywhere; }
+.me-profile p { color:var(--muted); margin:0; }
+.me-description { white-space:pre-wrap; overflow-wrap:anywhere; }
+.me-bookmarks-link { display:inline-block; margin-top:20px; font-size:14px; }
+.me-content-item { display:flex; gap:14px; align-items:flex-start; }
+.me-content-text { min-width:0; }
+.me-content-text p { margin:8px 0; line-height:1.7; color:var(--muted); font-size:14px; overflow-wrap:anywhere; white-space:pre-line; }
+.me-load-more { display:block; margin:20px auto 0; }
+.me-tabs { flex-wrap:wrap; }
+@media(max-width:520px) { .product-nav { flex-wrap:nowrap; padding:8px 6px; } .product-nav .product-brand { display:none; } .product-nav a { font-size:12px; padding:6px; } .product-nav .zhihu-account { padding:4px 7px; } .zhihu-account-name { display:none; } .me-page { padding:24px 12px 90px; } .me-card { padding:22px 18px; } .me-profile { gap:14px; } }
+
+.me-list .me-content-item { justify-content:flex-start; align-items:flex-start; }
+@media(max-width:768px) {
+  .product-nav { display:flex; min-height:54px; padding:8px 12px; }
+  .product-nav > a:not(.zhihu-account):not(.product-brand) { display:none; }
+  .product-nav .product-brand { display:inline-flex; }
+  .product-nav--agent { left:auto; width:auto; min-height:0; padding:0; }
+  .product-nav--agent .zhihu-account { background:rgba(255,255,255,.94); }
+}
