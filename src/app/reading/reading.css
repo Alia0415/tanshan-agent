@@ -143,6 +143,7 @@ a:focus-visible {
   color: var(--ink-soft);
   font-size: 16px;
   line-height: 1.8;
+  overflow-wrap: anywhere;
 }
 
 .agent-surface {
@@ -287,6 +288,11 @@ a:focus-visible {
 .summary-panel > p { margin: 9px 0 0; color: var(--muted); font-size: 14px; }
 .summary-actions { margin-left: 0; justify-content: flex-end; }
 .summary-panel > .api-error { margin-top: 14px; padding: 9px 12px; color: #b42318; background: #fff3f2; font-size: 12px; }
+.map-generation { margin-top: 22px; padding: 20px; border: 1px solid #d6e6ff; border-radius: 14px; background: #f5f9ff; }
+.map-generation-heading { color: var(--blue); font-size: 14px; }
+.map-generation .map-generation-heading + div { margin-top: 14px; }
+.map-generation p { margin: 12px 0 8px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.map-generation .text-button { padding: 4px 0; }
 
 /* 地图阶段放宽页面栅格，让左侧星空与右侧手机宽栏并列 */
 .page-grid:has(.stage-map) { grid-template-columns: minmax(0, 1fr); width: min(1480px, calc(100% - 24px)); }
@@ -301,8 +307,9 @@ a:focus-visible {
   overflow: hidden;
   border: 1px solid #22346e;
   background:
-    radial-gradient(90% 70% at 88% 6%, rgba(77, 139, 255, 0.16) 0%, rgba(77, 139, 255, 0) 55%),
-    radial-gradient(140% 100% at 80% 0%, #1c2f6e 0%, #111d50 48%, #0b1440 100%);
+    radial-gradient(70% 55% at 74% 18%, rgba(77, 139, 255, 0.22) 0%, transparent 72%),
+    radial-gradient(65% 60% at 18% 79%, rgba(33, 91, 191, 0.16) 0%, transparent 75%),
+    linear-gradient(145deg, #111b42 0%, #152552 53%, #0d1739 100%);
 }
 
 /* 地图阶段：星空路线与事件列表各占一半 */
@@ -315,6 +322,8 @@ a:focus-visible {
   margin-top: 0;
 }
 .map-stage-aside {
+  display: flex;
+  flex-direction: column;
   position: sticky;
   top: 74px;
   /* 固定高度（而非 max-height）：右栏内容切换不会改变网格行高，杜绝点击后整页窜动 */
@@ -333,7 +342,8 @@ a:focus-visible {
   .map-stage-main .sky-map { height: 100%; }
 }
 .map-stage-aside .category-results {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   margin-top: 0;
   display: flex;
   flex-direction: column;
@@ -346,6 +356,22 @@ a:focus-visible {
   overflow-y: auto;
   scrollbar-width: thin;
 }
+.category-navigation {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--line);
+  background: white;
+}
+.category-navigation > span { color: var(--muted); font-size: 12px; }
+.category-navigation > div { display: flex; gap: 8px; }
+.category-navigation button { border: 1px solid #dce4ef; border-radius: 10px; padding: 11px 16px; background: white; color: var(--blue); cursor: pointer; }
+.category-navigation .category-next { border-color: var(--blue); background: var(--blue); color: white; }
+.category-navigation button:disabled { opacity: .5; cursor: default; }
+.category-navigation button:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
 .map-stage-aside .post-list-enter { display: none; }
 .map-stage-aside .category-results-header { min-height: 0; padding: 16px 18px; grid-template-columns: 1fr auto; }
 .map-stage-aside .category-results-header p { display: none; }
@@ -376,15 +402,15 @@ a:focus-visible {
 .sky-trail { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; }
 .sky-path {
   fill: none;
-  stroke: rgba(169, 202, 246, 0.32);
-  stroke-width: 0.65;
-  stroke-dasharray: 2.4 1.9;
+  stroke: rgba(169, 202, 246, 0.4);
+  stroke-width: 0.48;
+  stroke-dasharray: 1.1 1.15;
   stroke-linecap: round;
 }
 .sky-path-progress {
   fill: none;
-  stroke: #6ea5ff;
-  stroke-width: 0.9;
+  stroke: #83b8ff;
+  stroke-width: 0.7;
   stroke-dasharray: 100;
   stroke-linecap: round;
   filter: drop-shadow(0 0 3px rgba(110, 165, 255, 0.72));
@@ -394,15 +420,22 @@ a:focus-visible {
 .sky-progress {
   position: absolute;
   top: 14px; left: 16px;
-  padding: 5px 13px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
   border-radius: 999px;
-  background: rgba(18, 45, 124, 0.55);
-  border: 1px solid rgba(125, 157, 204, 0.35);
-  color: #bed6ff;
+  background: rgba(13, 29, 76, 0.82);
+  border: 1px solid rgba(148, 190, 249, 0.42);
+  color: #d9e9ff;
   font-size: 11px;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(3, 9, 35, 0.2);
   z-index: 3;
   transition: opacity 0.45s ease;
 }
+.sky-progress span { color: #99bdf0; }
+.sky-progress strong { font-variant-numeric: tabular-nums; font-weight: 650; }
 
 .sky-map::after {
   content: "";
@@ -411,13 +444,13 @@ a:focus-visible {
   border-radius: inherit;
   background: rgba(3, 8, 31, 0.72);
   box-shadow: inset 0 0 120px rgba(0, 4, 24, 0.52);
-  backdrop-filter: none;
+  backdrop-filter: blur(0);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.16s ease;
+  transition: opacity 0.34s ease, backdrop-filter 0.34s ease;
   z-index: 3;
 }
-.sky-map.has-orbit::after { opacity: 1; }
+.sky-map.has-orbit::after { opacity: 1; backdrop-filter: blur(1.4px); }
 .sky-map.has-orbit .sky-progress { opacity: 0.24; }
 
 .orbit-dismiss {
@@ -469,7 +502,7 @@ a:focus-visible {
   transform: rotate(var(--orbit-angle));
   transform-origin: left center;
   opacity: 0;
-  animation: reading-orbit-spoke 0.55s ease var(--orbit-delay) forwards;
+  animation: reading-orbit-spoke 0.4s ease var(--orbit-delay) forwards;
 }
 .orbit-position {
   position: absolute;
@@ -478,8 +511,8 @@ a:focus-visible {
   width: 0;
   height: 0;
   opacity: 0;
-  filter: blur(5px);
-  animation: reading-orbit-arrive 0.58s cubic-bezier(0.22, 1, 0.36, 1) var(--orbit-delay) forwards;
+  filter: blur(2px);
+  animation: reading-orbit-arrive 0.42s cubic-bezier(0.22, 1, 0.36, 1) var(--orbit-delay) forwards;
 }
 .orbit-post {
   position: absolute;
@@ -503,6 +536,7 @@ a:focus-visible {
 }
 .orbit-post:hover,
 .orbit-post:focus-visible {
+  animation-play-state: paused;
   border-color: rgba(215, 233, 255, 0.92);
   background: linear-gradient(145deg, rgba(48, 100, 208, 0.96), rgba(17, 43, 109, 0.96));
   box-shadow: 0 12px 32px rgba(0, 5, 28, 0.44), 0 0 28px rgba(91, 156, 255, 0.36);
@@ -525,14 +559,7 @@ a:focus-visible {
   line-height: 1.3;
 }
 
-/* 数字按钮固定位置，并始终位于卡片和关闭遮罩上方 */
-.sky-station-group {
-  position: absolute;
-  width: 0;
-  height: 0;
-  z-index: 8;
-  transition: opacity 0.38s ease, filter 0.38s ease;
-}
+/* 站点零位移：无任何动画/过渡，禁止长按选中文本与触摸拖拽 */
 .sky-station {
   position: absolute;
   left: 0;
@@ -547,6 +574,8 @@ a:focus-visible {
   border-radius: 50%;
   background: transparent;
   cursor: pointer;
+  z-index: 5;
+  transition: opacity 0.28s ease, filter 0.28s ease;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
@@ -565,11 +594,12 @@ a:focus-visible {
   font-size: 17px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  /* 仅颜色与阴影反馈，不移动圆点 */
-  transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+  /* 仅颜色/阴影软过渡，绝无 transform，位置恒定 */
+  transition: border-color 0.28s ease, background-color 0.28s ease, color 0.28s ease, box-shadow 0.28s ease;
 }
 .sky-dot b { font-weight: 700; }
-.sky-station:hover .sky-dot { border-color: #cfe0ff; background: rgba(28, 47, 110, 0.92); }
+.sky-station:hover .sky-dot,
+.sky-station:focus-visible .sky-dot { border-color: #e6f2ff; background: rgba(37, 76, 166, 0.96); box-shadow: 0 0 0 5px rgba(117, 173, 255, 0.16), 0 0 30px rgba(94, 160, 255, 0.52); }
 .sky-station.visited .sky-dot { background: #122d7c; border-color: #4d8bff; color: #d9e7ff; }
 .sky-station.current .sky-dot {
   background: #0b4bc4;
@@ -577,23 +607,37 @@ a:focus-visible {
   color: white;
   box-shadow: 0 0 0 6px rgba(77, 139, 255, 0.16), 0 0 26px rgba(77, 139, 255, 0.55);
 }
+.sky-station:hover, .sky-station:focus-visible { z-index: 9; }
+.sky-station:hover .sky-dot, .sky-station:focus-visible .sky-dot { border-color: #e6f2ff; box-shadow: 0 0 0 5px rgba(117, 173, 255, 0.2), 0 0 30px rgba(94, 160, 255, 0.62); }
 
-.sky-tag {
+/* 点击涟漪：从球心对称扩散后消失，纯 scale/opacity，不产生任何位移 */
+.sky-dot::before {
+  content: "";
   position: absolute;
-  left: 0;
-  top: 38px;
-  width: max-content;
-  max-width: 138px;
-  transform: translateX(-50%);
-  display: grid;
-  text-align: center;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid rgba(158, 199, 250, 0.75);
+  opacity: 0;
   pointer-events: none;
 }
+.sky-station.current .sky-dot::before {
+  animation: reading-sky-ripple 0.7s ease-out 1 both;
+}
+.sky-tag { display: grid; max-width: 138px; text-align: center; }
 .sky-tag strong { color: #dbe4f5; font-size: 13px; line-height: 1.4; }
-.sky-station-group:has(.sky-station.current) .sky-tag strong { color: white; }
-.sky-map.has-orbit .sky-station-group:not(.orbit-center) { opacity: 0.22; filter: saturate(0.65); }
-.sky-map.has-orbit .sky-station-group.orbit-center { opacity: 1; filter: none; z-index: 8; }
-.sky-station:focus-visible { outline: 2px solid #9ec7fa; outline-offset: 3px; border-radius: 50%; }
+.sky-preview { position: absolute; top: 4px; width: min(230px, 38vw); padding: 13px 15px; border: 1px solid rgba(157, 197, 255, 0.5); border-radius: 14px; background: rgba(11, 28, 72, 0.94); color: #dceaff; box-shadow: 0 15px 40px rgba(2, 8, 34, 0.38); text-align: left; pointer-events: none; opacity: 0; visibility: hidden; transform: translateY(7px); transition: opacity .23s ease, transform .23s ease, visibility .23s; z-index: 9; }
+.sky-station.preview-right .sky-preview { left: calc(100% + 8px); }
+.sky-station.preview-left .sky-preview { right: calc(100% + 8px); }
+.sky-station:hover .sky-preview, .sky-station:focus-visible .sky-preview { opacity: 1; visibility: visible; transform: translateY(0); }
+.sky-map.has-orbit .sky-preview { opacity: 0; visibility: hidden; }
+.sky-preview small { display: block; color: #96bcf2; font-size: 11px; }
+.sky-preview b { display: block; margin-top: 5px; color: white; font-size: 14px; line-height: 1.4; }
+.sky-preview > span { display: -webkit-box; margin-top: 6px; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; font-size: 11px; line-height: 1.55; }
+.sky-station.current .sky-tag strong { color: white; }
+.sky-map.has-orbit .sky-station:not(.orbit-center) { opacity: 0.2; filter: saturate(0.45) brightness(0.72); }
+.sky-map.has-orbit .sky-station.orbit-center { opacity: 1; filter: none; z-index: 8; }
+.sky-station:focus-visible { outline: 2px solid #9ec7fa; outline-offset: 4px; border-radius: 12px; }
+@media (hover: none) { .sky-preview { display: none; } }
 
 .source-disclaimer { margin: 16px 0 0; color: var(--muted); font-size: 11px; }
 
@@ -913,7 +957,7 @@ a:focus-visible {
 }
 
 @keyframes reading-orbit-arrive {
-  0% { opacity: 0; filter: none; }
+  0% { opacity: 0; filter: blur(2px); }
   100% { opacity: 1; filter: blur(0); }
 }
 @keyframes reading-orbit-spoke {
