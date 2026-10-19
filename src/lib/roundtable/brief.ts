@@ -32,10 +32,12 @@ export function displayClaim(message: RoundMessage, summaries: Record<string, st
 }
 
 export function conciseClaim(message: RoundMessage): string | undefined {
-  for (const value of [message.brief?.claim, message.summary]) {
-    const claim = value?.trim();
-    if (claim && claim.length <= 40) return claim;
-  }
+  // A brief is already a semantic summary. Historical briefs may exceed the
+  // current generation limit; keep them readable instead of paying to redo them.
+  const claim = message.brief?.claim.trim();
+  if (claim) return claim;
+  const summary = message.summary?.trim();
+  if (summary && summary.length <= 40) return summary;
 }
 
 export async function summarizeMessages(round: Roundtable, ids: string[], model: ModelJson) {

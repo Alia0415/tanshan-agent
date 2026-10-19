@@ -17,6 +17,7 @@ import { db, ownerHash } from "./store";
 import { deduplicate, request, ZhihuProvider, type KnowledgeProvider } from "./providers";
 import { deepseekJson } from "./deepseek";
 import { isPublicDemo } from "./public-demo";
+import { issueRoundtableCheckpoint, restoreRoundtableCheckpoint } from "./roundtable-checkpoint";
 import {
   demoRoundtableInstructions,
   demoRoundtableSources,
@@ -40,33 +41,66 @@ function ensureTable() {
   db().prepare("DELETE FROM roundtables WHERE expires <= ?").run(Date.now());
   state.tanshanRounds = true;
 }
-function load(id: string, token: string): Roundtable {
+function withCheckpoint(round: Roundtable, token: string): Roundtable {
+  round.checkpoint = issueRoundtableCheckpoint(round, token);
+  return round;
+}
+function load(id: string, token: string, checkpoint?: string): Roundtable {
   ensureTable();
-  const row = db()
+  let row = db()
     .prepare("SELECT data, owner, expires FROM roundtables WHERE id = ?")
     .get(id) as Row | undefined;
-  if (!row || row.expires <= Date.now() || row.owner !== ownerHash(token))
+  const notFound = () => new AppError(
+    "ROUNDTABLE_NOT_FOUND", "这场圆桌不存在或已过期，请重新发起。", 404,
+  );
+  // An existing room's owner, expiry and provider remain authoritative. A
+  // checkpoint cannot bypass these checks to revive an expired or live room.
+  if (row && (row.expires <= Date.now() || row.owner !== ownerHash(token))) throw notFound();
+  let round = row ? JSON.parse(row.data) as Roundtable : undefined;
+  if (round && round.provider !== (isPublicDemo() ? "demo" : "live"))
+    throw new AppError(
+      "ROUNDTABLE_MODE_CHANGED",
+      "这场圆桌属于其他运行模式，请重新发起一场圆桌。",
+      409,
+    );
+  const portable = restoreRoundtableCheckpoint(checkpoint, id, token);
+  if (portable && (!round || (portable.checkpointRevision ?? 0) > (round.checkpointRevision ?? 0))) {
+    // One atomic conditional write handles concurrent workers. A stale browser
+    // cannot replace a newer row, even if it arrived after our initial read.
+    db().prepare(
+      "INSERT INTO roundtables (id, owner, expires, data) VALUES (?, ?, ?, ?) " +
+      "ON CONFLICT(id) DO UPDATE SET data = excluded.data, expires = excluded.expires " +
+      "WHERE roundtables.owner = excluded.owner AND roundtables.expires > ? " +
+      "AND json_extract(roundtables.data, '$.provider') = 'demo' " +
+      "AND COALESCE(json_extract(roundtables.data, '$.checkpointRevision'), 0) < ?",
+    ).run(id, ownerHash(token), Date.parse(portable.expiresAt), JSON.stringify(portable),
+      Date.now(), portable.checkpointRevision ?? 0);
+    row = db().prepare("SELECT data, owner, expires FROM roundtables WHERE id = ?").get(id) as Row | undefined;
+    round = row ? JSON.parse(row.data) as Roundtable : undefined;
+  }
+  if (!row || !round || row.expires <= Date.now() || row.owner !== ownerHash(token))
     throw new AppError(
       "ROUNDTABLE_NOT_FOUND",
       "这场圆桌不存在或已过期，请重新发起。",
       404,
     );
-  const round = JSON.parse(row.data) as Roundtable;
   if (round.provider !== (isPublicDemo() ? "demo" : "live"))
     throw new AppError(
       "ROUNDTABLE_MODE_CHANGED",
       "这场圆桌属于其他运行模式，请重新发起一场圆桌。",
       409,
     );
-  return round;
+  return withCheckpoint(round, token);
 }
 function save(round: Roundtable, token: string) {
+  const persisted = { ...round };
+  delete persisted.checkpoint;
   db()
     .prepare(
       "INSERT INTO roundtables (id, owner, expires, data) VALUES (?, ?, ?, ?) " +
         "ON CONFLICT(id) DO UPDATE SET data = excluded.data",
     )
-    .run(round.id, ownerHash(token), Date.parse(round.expiresAt), JSON.stringify(round));
+    .run(round.id, ownerHash(token), Date.parse(round.expiresAt), JSON.stringify(persisted));
 }
 
 // The roundtable can run on a faster model than the Q&A answer generator;
@@ -196,9 +230,10 @@ export async function startRoundtable(
         : "local-demo-script",
     );
     labelDemoRoundtable(round);
+    round.checkpointRevision = 0;
     ensureTable();
     save(round, token);
-    return round;
+    return withCheckpoint(round, token);
   }
   onProgress?.("正在检索知乎上的真实讨论");
   // Two queries give the roster enough distinct viewpoints; failures here are
@@ -234,8 +269,8 @@ export async function startRoundtable(
   return round;
 }
 
-export function readRoundtable(id: string, token: string) {
-  return load(id, token);
+export function readRoundtable(id: string, token: string, checkpoint?: string) {
+  return load(id, token, checkpoint);
 }
 
 // Listing projection for the intro screen so a refresh can resume a discussion.
@@ -259,67 +294,72 @@ export function listRoundtables(token: string): RoundtableSummary[] {
     }));
 }
 
-async function updateRound<T>(id: string, token: string, work: (round: Roundtable) => Promise<T>) {
-  load(id, token); // Check ownership before acquiring the shared lock.
+async function updateRound<T>(id: string, token: string, work: (round: Roundtable) => Promise<T>, checkpoint?: string) {
+  load(id, token, checkpoint); // Check ownership before acquiring the shared lock.
   return mutateRoundtable(db(), id, async (assertOwner) => {
-    const round = load(id, token);
+    const round = load(id, token, checkpoint);
+    const revision = round.checkpointRevision ?? 0;
     const result = await work(round);
     if (isPublicDemo()) labelDemoRoundtable(round);
     // Fence validation and commit must be atomic even across server processes.
     db().exec("BEGIN IMMEDIATE");
     try {
       assertOwner();
-      load(id, token); // Do not revive a discussion that expired during generation.
+      const current = load(id, token); // Do not revive a discussion that expired during generation.
+      if ((current.checkpointRevision ?? 0) !== revision)
+        throw new AppError("ROUNDTABLE_CONFLICT", "讨论已在另一页面更新，请刷新后继续。", 409);
+      if (isPublicDemo()) round.checkpointRevision = revision + 1;
       save(round, token);
       db().exec("COMMIT");
     } catch (error) {
       db().exec("ROLLBACK");
       throw error;
     }
+    withCheckpoint(round, token);
     return result;
   });
 }
 
-export async function advance(id: string, token: string, expectedTurn?: number, model: ModelJson = zhihuModel) {
+export async function advance(id: string, token: string, expectedTurn?: number, model: ModelJson = zhihuModel, checkpoint?: string) {
   return updateRound(id, token, async (round) => {
     if (expectedTurn !== undefined && expectedTurn !== round.scheduler.turn) return round;
     await advanceRoundtable(round, round.sources, currentModel(model));
     return round;
-  });
+  }, checkpoint);
 }
 
 const messageSchema = z.string().trim().min(1).max(300);
-export async function postMessage(id: string, token: string, contentInput: string, model: ModelJson = zhihuModel) {
+export async function postMessage(id: string, token: string, contentInput: string, model: ModelJson = zhihuModel, checkpoint?: string) {
   const content = messageSchema.parse(contentInput);
   return updateRound(id, token, async (round) => {
     await joinUser(round, round.sources, currentModel(model), content);
     return round;
-  });
+  }, checkpoint);
 }
 
-export async function inviteGuest(id: string, token: string, guestId: string) {
+export async function inviteGuest(id: string, token: string, guestId: string, checkpoint?: string) {
   return updateRound(id, token, async (round) => {
     await joinGuest(round, round.sources, currentModel(), guestId);
     return round;
-  });
+  }, checkpoint);
 }
 
-export async function completeEvidence(id: string, token: string, ids: string[]) {
+export async function completeEvidence(id: string, token: string, ids: string[], checkpoint?: string) {
   return updateRound(id, token, async (round) => {
     const summaries = await summarizeEvidence(round, ids, currentModel());
     for (const message of round.messages) {
       if (summaries[message.id]) message.evidencePoints = summaries[message.id];
     }
     return summaries;
-  });
+  }, checkpoint);
 }
 
-export async function completeBriefs(id: string, token: string, ids: string[]) {
+export async function completeBriefs(id: string, token: string, ids: string[], checkpoint?: string) {
   return updateRound(id, token, async (round) => {
     const summaries = await summarizeMessages(round, ids, currentModel());
     for (const message of round.messages) {
       if (summaries[message.id]) message.summary = summaries[message.id];
     }
     return summaries;
-  });
+  }, checkpoint);
 }

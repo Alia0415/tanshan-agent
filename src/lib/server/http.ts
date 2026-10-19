@@ -30,6 +30,7 @@ export async function identity(create = false) {
 export async function body<T>(
   request: Request,
   schema: z.ZodType<T>,
+  maxBytes = 16384,
 ): Promise<T> {
   const origin = request.headers.get("origin");
   // Next.js may reconstruct request.url with localhost even when the browser used 127.0.0.1.
@@ -54,10 +55,10 @@ export async function body<T>(
   }
   if (!request.headers.get("content-type")?.includes("application/json"))
     throw new AppError("INVALID_BODY", "请求内容需要使用 JSON 格式。", 415);
-  if (Number(request.headers.get("content-length") || 0) > 16384)
+  if (Number(request.headers.get("content-length") || 0) > maxBytes)
     throw new AppError("BODY_TOO_LARGE", "输入内容太长。", 413);
   const raw = await request.text();
-  if (Buffer.byteLength(raw, "utf8") > 16384)
+  if (Buffer.byteLength(raw, "utf8") > maxBytes)
     throw new AppError("BODY_TOO_LARGE", "输入内容太长。", 413);
   let data: unknown;
   try {

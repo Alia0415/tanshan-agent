@@ -214,6 +214,18 @@ test("incomplete takeaway never masquerades as a supported viewpoint", async () 
   assert.equal(round.messages.at(-1)?.content, "完整论证");
 });
 
+test("slightly longer generated takeaways retain the existing claim and evidence", async () => {
+  const round = await bootstrap(fakeTurns);
+  const claim = "先比较实际拍摄任务与携带习惯，再用同一场景试用器材；样例只能提供判断步骤，不能替你确认预算与具体型号。";
+  const evidence = "示例指出，应把机身和镜头重量一并考虑，在同一个真实拍摄任务中核对对焦、操作和导出流程，记录自己真正遇到的限制，而不是只比较参数。这个方法仍需结合自己的出行习惯与已有经验核实。[1]";
+  assert.ok(claim.length > 40 && evidence.length > 60);
+  await advanceRoundtable(round, sources, async () => ({ turns: [
+    { speakerRoleId: "role-1", content: "完整论证[1]", brief: { claim, evidence }, citations: [1] },
+  ] }));
+  assert.equal(round.messages.at(-1)?.brief?.claim, claim);
+  assert.equal(round.messages.at(-1)?.brief?.evidence, evidence);
+});
+
 test("each dropped guest speaks, including after completion, and unknown guests are rejected", async () => {
   const round = await bootstrap(fakeTurns);
   while (round.scheduler.state !== "complete") await advanceRoundtable(round, sources, fakeTurns);

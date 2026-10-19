@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { LoaderCircle, Send, Sparkles } from "lucide-react";
+import { LoaderCircle, Pause, Play, Send, Sparkles } from "lucide-react";
 import { displayClaim } from "@/lib/roundtable/brief";
 import type { Roundtable, RoundtableSummary } from "@/lib/roundtable/engine";
 import type { PreviewSource } from "@/lib/roundtable/start-stream";
@@ -31,6 +31,9 @@ export function WeChatChat({
   onSend,
   onTogglePlaying,
   onSummaries,
+  onRoundUpdated,
+  unavailable = false,
+  onRestart,
 }: {
   round: Roundtable;
   busy: string;
@@ -39,12 +42,37 @@ export function WeChatChat({
   onSend: (content: string) => void;
   onTogglePlaying: () => void;
   onSummaries?: (summaries: Record<string, string>) => void;
+  onRoundUpdated?: (round: Roundtable) => void;
+  unavailable?: boolean;
+  onRestart?: () => void;
 }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [evidence, setEvidence] = useState<Record<string, string[]>>({});
   const [evidenceStatus, setEvidenceStatus] = useState<Record<string, "loading" | "error" | "ready">>({});
   const evidenceRequests = useRef(new Set<string>());
+  const [draft, setDraft] = useState("");
+  const [summaries, setSummaries] = useState<Record<string, string>>({});
+  const [summaryErrors, setSummaryErrors] = useState<Record<string, boolean>>({});
+  const requested = useRef(new Set<string>());
+  const [retry, setRetry] = useState(0);
+  const [autoStarted, setAutoStarted] = useState(round.scheduler.turn > 0);
+  const requestScope = useRef<{ id: string; controller: AbortController } | null>(null);
+  useEffect(() => {
+    const scope = { id: round.id, controller: new AbortController() };
+    requestScope.current = scope;
+    const claims = requested.current;
+    const proofs = evidenceRequests.current;
+    return () => {
+      scope.controller.abort();
+      claims.clear();
+      proofs.clear();
+      if (requestScope.current === scope) requestScope.current = null;
+    };
+  }, [round.id]);
   const loadEvidence = async (id: string) => {
+    const scope = requestScope.current;
+    if (!scope || scope.id !== round.id || unavailable) return;
+    const current = () => requestScope.current === scope && !scope.controller.signal.aborted;
     const message = round.messages.find((item) => item.id === id);
     if (message?.brief?.evidencePoints?.length || message?.evidencePoints?.length || evidence[id] || evidenceRequests.current.has(id)) return;
     evidenceRequests.current.add(id);
@@ -52,26 +80,29 @@ export function WeChatChat({
     try {
       const response = await fetch("/api/roundtables/" + round.id + "/briefs", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: [id], kind: "evidence" }),
-        signal: AbortSignal.timeout(150_000),
+        body: JSON.stringify({ ids: [id], kind: "evidence", checkpoint: round.checkpoint, includeRound: true }),
+        signal: AbortSignal.any([scope.controller.signal, AbortSignal.timeout(150_000)]),
       });
       if (!response.ok) throw new Error("Evidence summary failed");
-      const result = await response.json() as Record<string, string[]>;
+      const data = await response.json() as Record<string, string[]> | { summaries: Record<string, string[]>; roundtable: Roundtable };
+      if (!current()) return;
+      const updated = "roundtable" in data && !Array.isArray(data.roundtable) ? data.roundtable : undefined;
+      const result = updated ? (data as { summaries: Record<string, string[]> }).summaries : data as Record<string, string[]>;
+      if (updated && updated.id !== round.id) throw new Error("Mismatched roundtable");
       if (!result[id]?.length) throw new Error("Missing evidence summary");
       setEvidence((current) => ({ ...current, ...result }));
       setEvidenceStatus((current) => ({ ...current, [id]: "ready" }));
+      if (updated) onRoundUpdated?.(updated);
     } catch {
-      setEvidenceStatus((current) => ({ ...current, [id]: "error" }));
+      if (current()) setEvidenceStatus((current) => ({ ...current, [id]: "error" }));
     } finally {
-      evidenceRequests.current.delete(id);
+      if (current()) evidenceRequests.current.delete(id);
     }
   };
-  const [draft, setDraft] = useState("");
-  const [summaries, setSummaries] = useState<Record<string, string>>({});
-  const [summaryError, setSummaryError] = useState(false);
-  const requested = useRef(new Set<string>());
-  const [retry, setRetry] = useState(0);
   useEffect(() => {
+    const scope = requestScope.current;
+    if (!scope || scope.id !== round.id || unavailable) return;
+    const current = () => requestScope.current === scope && !scope.controller.signal.aborted;
     const ids = round.messages.filter((message) =>
       message.speaker !== "user" && !displayClaim(message) &&
       !summaries[message.id] && !requested.current.has(message.id)
@@ -81,15 +112,24 @@ export function WeChatChat({
     void fetch("/api/roundtables/" + round.id + "/briefs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids }),
-      signal: AbortSignal.timeout(150_000),
+      body: JSON.stringify({ ids, checkpoint: round.checkpoint, includeRound: true }),
+      signal: AbortSignal.any([scope.controller.signal, AbortSignal.timeout(150_000)]),
     }).then(async (response) => {
       if (!response.ok) throw new Error("Summary failed");
-      const result = await response.json() as Record<string, string>;
+      const data = await response.json() as Record<string, string> | { summaries: Record<string, string>; roundtable: Roundtable };
+      if (!current()) return;
+      const updated = "roundtable" in data && typeof data.roundtable !== "string" ? data.roundtable : undefined;
+      const received = updated ? (data as { summaries: Record<string, string> }).summaries : data as Record<string, string>;
+      if (updated && updated.id !== round.id) throw new Error("Mismatched roundtable");
+      const result = Object.fromEntries(ids.filter((id) => typeof received[id] === "string" && received[id].trim()).map((id) => [id, received[id].trim()]));
       setSummaries((current) => ({ ...current, ...result }));
+      setSummaryErrors((current) => ({ ...current, ...Object.fromEntries(ids.map((id) => [id, !result[id]])) }));
       onSummaries?.(result);
-    }).catch(() => setSummaryError(true));
-  }, [round.id, round.messages, summaries, retry, onSummaries]);
+      if (updated) onRoundUpdated?.(updated);
+    }).catch(() => {
+      if (current()) setSummaryErrors((current) => ({ ...current, ...Object.fromEntries(ids.map((id) => [id, true])) }));
+    });
+  }, [round.id, round.messages, round.checkpoint, summaries, retry, onSummaries, onRoundUpdated, unavailable]);
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
@@ -100,11 +140,16 @@ export function WeChatChat({
       : (round.roles.find((role) => role.id === speaker)?.name ?? speaker);
   const submit = () => {
     const content = draft.trim();
-    if (!content || busy) return;
+    if (!content || busy || unavailable) return;
     onSend(content);
     setDraft("");
   };
   const complete = round.scheduler.state === "complete";
+  const showStartGuide = !autoStarted && !playing && !complete;
+  const togglePlaying = () => {
+    if (!playing) setAutoStarted(true);
+    onTogglePlaying();
+  };
   const speakerIndex = new Map<string, number>();
   round.roles.forEach((role, index) => speakerIndex.set(role.id, index));
   return (
@@ -159,7 +204,17 @@ export function WeChatChat({
                       <>
                         <div className="wechat-takeaway">
                           <p className="wechat-claim"><b>议题</b>{message.brief?.topic || round.question}</p>
-                          <div className="wechat-viewpoint"><b>{message.phase === "opening" ? "开场" : "观点"}</b>{viewpoint ? <p>{viewpoint}</p> : summaryError ? <button type="button" className="wechat-expand" onClick={() => { requested.current.clear(); setSummaryError(false); setRetry((value) => value + 1); }}>重新生成观点</button> : <span role="status" aria-label="正在总结观点"><LoaderCircle size={14} className="spin" /></span>}</div>
+                          <div className="wechat-viewpoint">
+                            <b>{message.phase === "opening" ? "开场" : "观点"}</b>
+                            {viewpoint ? <p>{viewpoint}</p> : unavailable || summaryErrors[message.id] ? <>
+                              <p className="wechat-summary-missing">观点暂未整理，可展开论据查看完整发言。</p>
+                              {!unavailable && <button type="button" className="wechat-expand" onClick={() => {
+                                requested.current.delete(message.id);
+                                setSummaryErrors((current) => ({ ...current, [message.id]: false }));
+                                setRetry((value) => value + 1);
+                              }}>重新生成观点</button>}
+                            </> : <span role="status" aria-label="正在总结观点"><LoaderCircle size={14} className="spin" /></span>}
+                          </div>
                         </div>
 
                         {message.phase !== "opening" && <>
@@ -171,7 +226,7 @@ export function WeChatChat({
                           {points?.length ? <ol className="wechat-evidence-list" aria-label="论据要点">{points.map((point, pointIndex) => {
                             const colon = point.indexOf("：");
                             return <li key={pointIndex}>{colon > 0 && colon <= 10 ? <><b>{point.slice(0, colon)}</b><span>{point.slice(colon + 1)}</span></> : <span>{point}</span>}</li>;
-                          })}</ol> : evidenceStatus[message.id] === "error" ? <p className="wechat-evidence">论据整理暂时失败。<button type="button" className="wechat-expand" onClick={() => void loadEvidence(message.id)}>重试</button></p> : <p className="wechat-evidence" role="status">正在整理分条论据…</p>}
+                          })}</ol> : unavailable || evidenceStatus[message.id] === "error" ? <p className="wechat-evidence">论据暂未整理，可查看完整发言。{!unavailable && <button type="button" className="wechat-expand" onClick={() => void loadEvidence(message.id)}>重试</button>}</p> : <p className="wechat-evidence" role="status">正在整理分条论据…</p>}
                           <details className="wechat-original">
                             <summary>查看完整发言</summary>
                             {message.content.split(/\n+/).filter(Boolean).map((paragraph, paragraphIndex) => <p key={paragraphIndex}>{paragraph}</p>)}
@@ -213,17 +268,29 @@ export function WeChatChat({
           {error}
         </p>
       )}
+      {unavailable ? <div className="wechat-recovery">
+        <p>本场内容仍可阅读，可重新发起讨论。</p>
+        {onRestart && <button type="button" className="wechat-tool" onClick={onRestart} disabled={Boolean(busy)}>重新发起</button>}
+      </div> : <p id="roundtable-play-guide" className={"wechat-play-guide" + (showStartGuide ? " ready" : "")} role="status">
+        {complete ? "讨论已总结，你仍可在下方发言追问。"
+          : playing ? "自动讨论中，可随时暂停或在下方插话。"
+          : showStartGuide ? <>开场已就绪。点击<strong>自动讨论</strong>，让嘉宾依次发言；可随时暂停或插话。</>
+          : "自动讨论已暂停，点击继续，也可在下方插话。"}
+      </p>}
       <div className="wechat-toolbar">
         <button
           type="button"
-          className="wechat-tool"
-          onClick={onTogglePlaying}
-          disabled={complete}
+          className={"wechat-tool wechat-play" + (showStartGuide && !unavailable ? " ready" : "")}
+          onClick={togglePlaying}
+          disabled={unavailable || complete || (Boolean(busy) && !playing)}
+          aria-pressed={playing}
+          aria-describedby={unavailable ? undefined : "roundtable-play-guide"}
         >
-          {playing ? "暂停自动讨论" : "自动讨论"}
+          {playing ? <Pause size={13} aria-hidden="true" /> : <Play size={13} aria-hidden="true" />}
+          {complete ? "讨论已结束" : playing ? "暂停讨论" : autoStarted ? "继续自动讨论" : "自动讨论"}
         </button>
         <span className="wechat-state">
-          {complete ? "已总结 · 仍可发言" : `第 ${round.messages.length} 条`}
+          {unavailable ? "本场暂不可继续" : complete ? "已总结 · 仍可发言" : playing ? "自动讨论中" : autoStarted ? "已暂停" : "等待开始"}
         </span>
       </div>
       <footer className="wechat-input">
@@ -234,15 +301,15 @@ export function WeChatChat({
           onKeyDown={(event) => {
             if (event.key === "Enter") submit();
           }}
-          placeholder={busy ? "Agent 正在回应…" : "发言加入讨论…"}
-          disabled={Boolean(busy)}
+          placeholder={unavailable ? "请重新发起讨论" : busy ? "Agent 正在回应，可先输入…" : "发言加入讨论…"}
+          disabled={unavailable}
           aria-label="圆桌发言"
         />
         <button
           type="button"
           className="wechat-send"
           onClick={submit}
-          disabled={Boolean(busy) || !draft.trim()}
+          disabled={Boolean(busy) || unavailable || !draft.trim()}
           aria-label="发送"
         >
           <Send size={15} />

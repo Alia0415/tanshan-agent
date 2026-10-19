@@ -51,6 +51,8 @@ export interface Roundtable {
   expiresAt: string;
   provider: "live" | "demo";
   model: string | null;
+  checkpoint?: string;
+  checkpointRevision?: number;
   // Sources are embedded so knowledge bases stay intact across restarts;
   // only their ids appear in citations.
   sources: Source[];
@@ -75,8 +77,10 @@ export type ModelJson = (prompt: string, payload: unknown) => Promise<unknown>;
 
 const briefSchema = z.object({
   topic: z.string().trim().min(1).max(200).optional().catch(undefined),
-  claim: z.string().trim().min(1).max(40),
-  evidence: z.string().trim().min(1).max(60),
+  // Keep an otherwise useful generated takeaway when the model exceeds the
+  // preferred display length; losing the whole object triggers another paid call.
+  claim: z.string().trim().min(1).max(200),
+  evidence: z.string().trim().min(1).max(600),
   evidencePoints: z.array(z.string().trim().min(1).max(60)).min(1).max(5).optional().catch(undefined),
 }).optional().catch(undefined);
 
