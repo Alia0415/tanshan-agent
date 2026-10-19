@@ -1,95 +1,66 @@
-# 探山 Agent
+<p align="center">
+  <img src="docs/assets/hero.svg" alt="探山 Tanshan：Agent 问答、阅读助手与观点圆桌，三个独立入口，按需衔接" width="100%" />
+</p>
 
-**从一个问题出发，找到适合自己处境的知乎经验与观点。**
+# 探山 Tanshan
 
-探山把问题澄清、知乎检索、回答阅读和多立场讨论连接起来：先理解你的处境，再找到值得读的帖子；用阅读地图和文章速读整理线索，用观点圆桌看见不同立场。覆盖工作、消费、生活、人际关系、技术与学习，不限定提问领域。
+**把别人的经验，放回自己的处境。**
 
-[页面预览](#页面预览) · [在线体验](#在线体验) · [功能入口](#功能入口) · [快速开始](#快速开始) · [配置说明](#配置说明) · [开发与验证](#开发与验证) · [项目文档](#项目文档)
+面对一个没有标准答案的问题，探山帮你澄清真正关心的事、找到值得读的知乎经验，再从不同立场继续讨论。工作、消费、生活与学习，都可以从一个具体问题开始。
 
-> 当前提供可本地运行的 Web 应用与 Agent 核心框架，目标是接入知乎站内对话。已实现开放 API 调用和 OAuth 登录接线，**知乎站内 Agent 的注册、宿主消息适配与发布尚未完成**。具体范围见 [Agent 范围说明](docs/AGENT_SCOPE.md)。
+**[在线体验 ↗](https://tanshan-270489-8-1443398117.sh.run.tcloudbase.com/demo)** · [一分钟演示](#一分钟演示) · [快速开始](#快速开始) · [文档导航](docs/README.md)
 
-## 页面预览
+[![CI](https://github.com/Alia0415/tanshan-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Alia0415/tanshan-agent/actions/workflows/ci.yml)
+![Node.js 24+](https://img.shields.io/badge/Node.js-24%2B-417E38?style=flat)
+![Next.js 16](https://img.shields.io/badge/Next.js-16-171717?style=flat)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)
 
-以下为应用的桌面端页面截图，每张独立展示，点击可查看原图。阅读页的热榜内容会随时间变化，圆桌截图展示主持人开场与角色入席。
+## 一分钟演示
 
-### 问答首页
+**两份 Offer，怎么选？** 用一个求职困境，分别看看问答、阅读与讨论能帮上什么忙。
 
-[![探山问答首页：提问框、智能追问和场景示例](docs/screenshots/home.png)](docs/screenshots/home.png)
+[![点击查看一分钟演示：观点圆桌中的「看带教，也看项目」片段](docs/demo/poster.jpg)](docs/demo/offer-demo.mp4)
 
-### 阅读发现
+[查看视频文件](docs/demo/offer-demo.mp4) · [下载 MP4](https://github.com/Alia0415/tanshan-agent/raw/refs/heads/main/docs/demo/offer-demo.mp4) · [演示说明与时间轴](docs/demo/README.md)
 
-[![阅读发现：热点问题与月亮唱片浏览界面](docs/screenshots/reading.png)](docs/screenshots/reading.png)
+60 秒 · 1080p · 无配音。视频为产品流程动效演示；三个功能独立使用，也能围绕同一问题按需关联。
 
-### 观点圆桌
+## 三个独立入口
 
-[![观点圆桌：夜间会场、主题切换与 Agent 库](docs/screenshots/roundtable.png)](docs/screenshots/roundtable.png)
+| Agent 问答 | 阅读助手 | 观点圆桌 |
+| --- | --- | --- |
+| 先问清处境，再找适合你的经验。 | 把分散的讨论，整理成可探索的阅读路线。 | 让不同立场坐到一张桌前，随时加入讨论。 |
+| [![Agent 问答首页](docs/screenshots/home.png)](docs/screenshots/home.png) | [![阅读助手发现页](docs/screenshots/reading.png)](docs/screenshots/reading.png) | [![观点圆桌会场](docs/screenshots/roundtable.png)](docs/screenshots/roundtable.png) |
+| 动态追问、可编辑条件、知乎帖子推荐与筛选说明。 | 热榜与曾经上榜的问题、阅读地图、文章思维导图。 | 原生角色动作与观点气泡、议题交锋、针对插话的回应。 |
+| `/` | `/reading` | `/roundtable` |
+
+### Agent 问答：答案从你的处境出发
+
+“异地高薪加班多，本地低薪但稳定，该怎么选？”
+
+探山会结合补充信息继续追问，例如每周留出的个人项目时间是不是硬性约束。最多 5 轮，随时可以跳过；结果优先展示知乎帖子、搜索摘要、筛选说明和原帖入口，辅助总结按需展开。修改条件后可以重新检索，也能从历史问题继续。
+
+### 阅读助手：先找到阅读重点
+
+从热榜、曾经上榜的问题或搜索发现话题；对已记录上榜的问题，确认关注点后生成阅读地图。切换路线，查看对应文章，再用**基于知乎搜索摘要的文章思维导图**预览内容结构，决定是否打开原文深入阅读。
+
+### 观点圆桌：看见分歧，也能追问
+
+主持人与 2–3 个立场角色围绕检索资料讨论，动作和文字气泡与发言同步。先看观点，再展开论据、完整发言与来源；用户插话后，由相关角色回应，也可从 Agent 库邀请补充角色。
+
+三个入口不要求依次使用。阅读页可把**问题标题**带到问答或圆桌，确认提交后才开始请求。
 
 ## 在线体验
 
-已提供使用原创预置样例的 AI 体验模式与 [腾讯云部署说明](docs/ONLINE_DEMO.md)，**目前尚未上线**。部署完成后，在此添加实际 HTTPS 在线体验链接，入口建议使用 `/demo`。
+**[打开探山体验页 ↗](https://tanshan-270489-8-1443398117.sh.run.tcloudbase.com/demo)**
 
-设置 `WENSHAN_PUBLIC_DEMO=1` 后，问答、阅读和圆桌使用预置样例资料，不请求知乎或 OAuth。配置服务端 `DEEPSEEK_API_KEY` 可保留 AI 追问、总结与讨论，模型请求会产生费用；不配置则回退到完整的本地脚本样例。页面会标明样例资料，知乎登录及账号内容不可用，样例不是实时知乎数据，AI 引用也不代表事实核验。
+公开体验使用原创预置样例，保留 AI 追问、阅读生成与多立场讨论；页面会标明样例身份，内容不代表实时知乎热榜或检索结果。体验额度由全站访客共享，知乎账号登录与账号内容在此模式下不可用。
 
-公开体验默认全站每天最多预约 **200 次 DeepSeek 上游请求**，所有访客共享，按 UTC 零点刷新；一次问题可能调用多次模型，因此不等于 200 位访客或 200 个问题。失败请求也占次数，计数随 SQLite 持久化；可通过服务端 `WENSHAN_DEMO_DAILY_AI_LIMIT` 设置有效正整数。
-
-标准模式实际接入知乎内容检索、知乎直答、DeepSeek 和知乎 OAuth。知乎资料凭证过期后，仅有 DeepSeek 仍无法提供真实知乎资料；圆桌的真实检索和生成也依赖知乎。原有 `WENSHAN_PROVIDER=demo` 仅覆盖问答，公开体验请使用全站开关。
-
-## 功能入口
-
-下表列出标准模式的服务依赖；在线体验使用预置资料，可选接入 DeepSeek 生成。
-
-| 功能 | 可以做什么 | 本地路径 | 服务依赖 |
-| --- | --- | --- | --- |
-| 探山问答 | 动态追问、可编辑条件、真实帖子推荐、历史问题与辅助总结 | `/` | 无密钥可体验规则演示；真实资料需要知乎凭证 |
-| 知乎阅读 | 热榜与历史热榜、问题搜索、阅读地图、文章速读与总结 | `/reading` | 知乎服务；阅读生成优先使用已配置的 DeepSeek，否则使用知乎直答 |
-| 观点圆桌 | 可视化角色、消息同步气泡、议题交锋、分条论据与访客插话 | `/roundtable` | 知乎检索与直答；实验能力 |
-| 我的收藏 | 按收藏夹保存帖子、查看原文、整理与移除收藏 | `/bookmarks` 或问答页收藏入口 | 应用内收藏，按匿名浏览器身份隔离；不等同于知乎账号收藏 |
-| 我的知乎 | OAuth 登录后查看授权范围内的创作、关注与收藏 | `/me` | OAuth 应用配置与用户授权 |
-
-所有入口由根目录应用统一提供，无需单独启动 `prototype/` 中的历史原型。阅读问题页可以携带问题标题进入问答或圆桌，确认提交后才开始请求。
-
-### 问答如何工作
-
-1. **理解问题**：结合你的原问题、经历和补充信息，判断是否需要追问；最多 5 轮，随时可以跳过。
-2. **查找经验**：检索知乎问题、回答与专栏文章；配置 DeepSeek 后可规划检索词并筛选相关结果。
-3. **先看来源**：优先展示帖子标题、作者、搜索摘要和原帖链接，最多推荐 5 篇，再提供可展开的辅助总结。
-4. **继续调整**：修改已有条件或追问选项，重新检索；也可以从历史问题继续，或把帖子存进收藏夹。
-
-搜索过程中显示当前阶段、已等待时间和预计用时；超过预计时间会明确提示。帖子卡片支持匿名“共鸣”互动，通过地球视图呈现共鸣反馈。
-
-可以试着问：
-
-- “第一次租房，预算有限，签合同前有哪些容易忽略的地方？”
-- “想买相机记录旅行，应该先明确哪些需求？”
-- “刚开始学习 Python，怎么安排一个能坚持下来的学习计划？”
-
-搜索摘要不等于全文；需要阅读全文时请打开知乎原帖。辅助总结和相关性判断不等于事实核验，普通直答文本不保证提供逐条引用。
-
-### 从发现问题到读懂文章
-
-- **发现问题**：用唱片式界面浏览热榜、切换曾经上榜的问题，也可以搜索自己感兴趣的话题。
-- **阅读地图**：进入问题后说明关注点，由阅读助手整理不同方向和候选帖子，支持继续调整阅读视角。
-- **文章速读**：帖子详情提供一句话结论、三步动画流程和文章总结，支持重播、生成失败重试及打开知乎原文。
-- **继续探讨**：把当前问题带入问答或圆桌，确认后再发起请求。
-
-文章速读与总结基于已有搜索摘要生成，页面会标明尚未获取全文；生成失败时保留明确的错误或摘要回退提示。
-
-### 让不同立场坐到一张桌前
-
-圆桌先检索真实知乎帖子，再组建主持人与 2–3 位立场 Agent。创建过程中会显示检索进度和已找到的资料。
-
-- **消息与角色同步**：收到开场、回复或总结时，对应角色自动出场并显示观点气泡；不需要先点击“自动讨论”。角色表现为动作与文字气泡，不包含语音播报。
-- **按议题交锋**：开启自动讨论后，角色围绕 1–3 个议题进行陈述和成对问答；议题澄清、证据不足或达到讨论边界后进入总结，保留共识与分歧。
-- **按需看论据**：先看议题和核心观点，再展开分条论据、完整发言和来源链接；缺少有效引用的发言会标记为尚待核实。
-- **随时参与**：发送消息加入讨论，或从 Agent 库拖入证据核验员、反方追问者、背景补充员。总结后仍可发言，既有总结不会自动重写。
-
-这些角色由同一个模型通过不同提示词和分配的材料扮演，不代表多个独立模型的事实核验。详细规则与并发保护见 [观点圆桌](docs/ROUNDTABLE.md)。
+本地标准模式可接入真实知乎检索、知乎直答、DeepSeek 与 OAuth。两种模式的范围和部署方式见 [公开体验说明](docs/ONLINE_DEMO.md)。
 
 ## 快速开始
 
-需要 **Node.js 24+** 和 npm，项目使用 Node.js 内置 SQLite。
-
-### 1. 获取代码并安装依赖
+需要 **Node.js 24+** 和 npm。项目使用 Node.js 内置 SQLite。
 
 ```sh
 git clone https://github.com/Alia0415/tanshan-agent.git
@@ -97,148 +68,67 @@ cd tanshan-agent
 npm ci
 ```
 
-### 2. 创建本地配置
-
-Windows PowerShell：
+复制配置示例：
 
 ```powershell
+# Windows PowerShell
 Copy-Item .env.example .env.local
 ```
 
-macOS / Linux：
-
 ```sh
+# macOS / Linux
 cp .env.example .env.local
 ```
 
-### 3. 启动应用
+在 `.env.local` 中设置以下开关，即可先运行三个入口的本地脚本样例，无需 API 密钥：
+
+```dotenv
+WENSHAN_PUBLIC_DEMO=1
+```
 
 ```sh
 npm run dev
 ```
 
-打开 [http://localhost:3000](http://localhost:3000)。在 `.env.local` 中设置 `WENSHAN_PUBLIC_DEMO=1` 后重启服务，从 [体验说明页](http://localhost:3000/demo) 进入：配置 DeepSeek 密钥体验 AI 生成，留空则体验本地脚本样例。默认 `WENSHAN_PUBLIC_DEMO=0` 保留标准模式，原有 `WENSHAN_PROVIDER=demo` 仅提供问答规则演示；阅读、圆桌和我的知乎按下方配置接入真实服务。
+打开 [http://localhost:3000/demo](http://localhost:3000/demo)。添加服务端 `DEEPSEEK_API_KEY` 后可体验 AI 生成；模型请求会消耗对应服务额度。切换配置后重启服务并新建会话。
 
-## 配置说明
+接入真实知乎资料、OAuth 和生产部署，请看 [运行指南](docs/GETTING_STARTED.md)、[详细配置](docs/CONFIGURATION.md) 与 [部署说明](docs/ONLINE_DEMO.md)。
 
-在根目录 `.env.local` 中修改配置，完成后**重启服务并新建会话**。全部变量见 [.env.example](.env.example)，模型行为、检索策略及调用限制见 [详细配置](docs/CONFIGURATION.md)。
+## 工程概览
 
-产品已更名为“探山 / Tanshan”，现有 `WENSHAN_*` 环境变量、数据库路径和存储标识保留兼容，**不要仅因品牌改名而替换这些配置名**。
-
-### 接入真实知乎资料
-
-```dotenv
-WENSHAN_PROVIDER=live
-ZHIHU_ACCESS_SECRET=填入自己的凭证
-```
-
-默认由知乎直答生成辅助总结。如果只需要问答中的真实帖子列表，设置 `ZHIHU_GENERATION_MODE=sources`，即可停止该流程的直答调用；这不会关闭阅读或圆桌自身的模型请求。
-
-### 启用模型追问与检索优化
-
-```dotenv
-DEEPSEEK_API_KEY=填入自己的密钥
-DEEPSEEK_MODEL=deepseek-flash
-```
-
-配置密钥后，默认自动启用动态追问，并在真实资料模式下启用检索词规划与相关性筛选。阅读助手也优先使用该模型，未配置时使用知乎直答。
-
-| 变量 | 默认值 | 可选行为 |
-| --- | --- | --- |
-| `WENSHAN_PUBLIC_DEMO` | `0` | `1` 使用预置资料并关闭知乎/OAuth 请求；有 DeepSeek 密钥时保留 AI 生成，否则本地脚本回退 |
-| `WENSHAN_DEMO_DAILY_AI_LIMIT` | `200` | 公开体验的全站每日上游请求次数，UTC 零点刷新，必须为有效正整数；正式模式不生效 |
-| `WENSHAN_PROVIDER` | `demo` | `live` 使用真实知乎资料 |
-| `WENSHAN_CLARIFICATION_MODE` | `auto` | `local` 使用本地规则；`deepseek` 强制模型追问并要求密钥 |
-| `WENSHAN_SEARCH_MODE` | `auto` | `basic` 使用基础关键词检索；`deepseek` 尝试模型优化 |
-| `ZHIHU_GENERATION_MODE` | `auto` | `sources` 仅返回问答检索结果 |
-| `ZHIHU_ANSWER_MODEL` | `zhida-thinking-1p5` | 问答辅助总结模型 |
-| `ZHIHU_TIMEOUT_MS` | `120000` | 知乎请求超时，单位毫秒 |
-| `WENSHAN_DB_PATH` | `.data/wenshan-agent-v2.sqlite` | SQLite 持久化路径 |
-
-`auto` 模式优先使用已配置的 DeepSeek，否则可回退到知乎助手。若仅验证旧问答演示和 HTTP smoke，可同时设置 `WENSHAN_PROVIDER=demo` 与 `WENSHAN_CLARIFICATION_MODE=local`；公开全站样例使用 `WENSHAN_PUBLIC_DEMO=1`。
-
-### 配置知乎 OAuth（可选）
-
-如需使用 `/me`，填写活动项目提供的应用信息：
-
-```dotenv
-ZHIHU_OAUTH_APP_ID=填入应用ID
-ZHIHU_OAUTH_APP_KEY=填入应用密钥
-ZHIHU_OAUTH_REDIRECT_URI=https://你的域名/api/oauth/callback
-```
-
-回调地址必须是登记的公网 HTTPS 地址，且与登记值完全一致。配置完成后访问 `/me` 发起登录；能否读取具体内容取决于应用权限和用户授权。
-
-所有密钥仅供服务端使用，不加 `NEXT_PUBLIC_` 前缀，不提交到 Git。开放 API Access Secret、OAuth 用户授权和站内 Agent 发布权限是不同的接入配置。
-
-## 开发与验证
-
-技术栈：**Next.js 16 · React 19 · TypeScript · Node.js SQLite · Zod**。
+**Next.js 16 · React 19 · TypeScript · Node.js SQLite · Zod**
 
 ```text
-agent/                  Agent 人设、开场白与工具映射
-src/app/                页面与 HTTP 接口
-src/lib/agent/          共享指令和文字消息处理入口
-src/lib/domain/         问题上下文与追问规则
-src/lib/server/         会话、持久化、服务适配与 OAuth
-src/lib/reading/        阅读发现与助手逻辑
-src/lib/roundtable/     圆桌编排引擎与提示词
-tests/                  受控测试
-scripts/                导出、冒烟测试与真实联调脚本
-docs/                   范围、配置、架构与接口文档
-prototype/              历史原型，非主应用启动入口
+src/app/          页面与 HTTP 接口
+src/components/   问答、阅读与圆桌交互
+src/lib/          会话编排、检索、模型与存储
+agent/            Agent 定义与宿主接入说明
+tests/            受控测试
+scripts/          导出与显式联调脚本
+deploy/           Docker Compose 与反向代理模板
+docs/             产品、演示、配置与架构文档
+prototype/        历史原型，非主应用启动入口
 ```
 
 | 命令 | 用途 |
 | --- | --- |
-| `npm run dev` | 启动开发服务 |
-| `npm run check` | ESLint、TypeScript 与受控测试，不调用真实外部模型 |
-| `npm run build` | 生产构建 |
-| `npm start` | 启动构建后的生产服务 |
-| `npm run test:smoke` | 对已启动的 demo 服务验收卡片与文字对话接口 |
-| `npm run agent:export` | 从共享定义导出人设与开场白 |
+| `npm run dev` | 本地开发 |
+| `npm run check` | ESLint、TypeScript 与受控测试 |
+| `npm run build` / `npm start` | 生产构建 / 启动 |
+| `npm run test:public-demo` | 对无 AI 密钥的公开样例服务做 HTTP 验收 |
 
-以下为**真实服务联调**，会消耗业务/API 额度，不在 CI 自动执行：
+更多命令与贡献流程见 [贡献指南](CONTRIBUTING.md)。CI 在 push 和 PR 时运行安装、检查与构建。
 
-| 命令 | 请求范围 |
+## 文档与当前边界
+
+| 想了解什么 | 从这里开始 |
 | --- | --- |
-| `npm run test:zhihu` | 一次知乎搜索与一次直答；`sources` 模式跳过直答 |
-| `npm run test:clarification` | 最多 5 次 DeepSeek 请求，验证跨场景追问 |
-| `npm run test:search` | 两个虚构需求的搜索前后对比；最多 8 次搜索和 7 次模型调用，不调用直答 |
+| 产品演示与三入口使用 | [演示指南](docs/DEMO.md) · [视频说明](docs/demo/README.md) |
+| 配置与上线 | [运行指南](docs/GETTING_STARTED.md) · [配置](docs/CONFIGURATION.md) · [公开体验部署](docs/ONLINE_DEMO.md) |
+| 原理与接口 | [工程架构](docs/ARCHITECTURE.md) · [API](docs/API.md) · [观点圆桌](docs/ROUNDTABLE.md) |
+| 知乎集成 | [Agent 范围](docs/AGENT_SCOPE.md) · [Agent 接入](agent/README.md) · [OAuth](docs/OAUTH.md) |
+| 开发与验收 | [贡献指南](CONTRIBUTING.md) · [验收状态](docs/ACCEPTANCE.md) · [全部文档](docs/README.md) |
 
-搜索联调结果写入已忽略的 `.data/search-quality-check.json`，仅用于小样本检查，不代表通用搜索准确率。
+搜索摘要和导图不等于全文阅读；角色引用与相关性筛选也不等于独立事实核验。圆桌由同一模型模拟不同立场，角色动作与文字气泡不包含语音播报。
 
-GitHub Actions 在 push 和 PR 时运行 `npm ci`、`npm run check` 与 `npm run build`。测试覆盖会话隔离、条件修改、收藏、共鸣、搜索排序、圆桌议题推进、引用校验、并发锁与开场进度流；真实服务的可用性仍需单独联调。
-
-## 部署与运行边界
-
-当前使用**单个 Node.js 实例与持久磁盘**。多副本或临时磁盘 Serverless 部署需要共享存储和持久任务队列。阅读热榜记录存放在 `.data/questions.json`，部署时也应保留 `.data`。
-
-在线 AI 体验推荐使用 [Compose 模板](deploy/compose.demo.yml)，通过 [环境变量示例](deploy/demo.env.example) 配置可选的 DeepSeek 密钥。应用仅绑定到 `127.0.0.1:3000`，再通过 HTTPS 反向代理公开访问。完整步骤、健康检查与 Nginx 模板见 [在线体验部署](docs/ONLINE_DEMO.md)。这需要运行 Node.js 服务，不能作为纯静态站点部署。
-
-标准模式的基础 Docker 启动方式：
-
-```sh
-docker build -t tanshan-agent .
-docker run -d --name tanshan -p 3000:3000 --env-file .env.local -v wenshan-data:/app/.data tanshan-agent
-```
-
-生产 Cookie 使用 Secure，应通过 HTTPS 反向代理访问。标准模式运行环境需能访问知乎及所配置的模型 API；在线体验的 AI 生成只需访问 DeepSeek，未配置密钥时使用本地脚本。恢复知乎凭证后，关闭 `WENSHAN_PUBLIC_DEMO`，切回 `WENSHAN_PROVIDER=live`，重启服务并新建会话。
-
-- **站内接入**：Docker 部署不会自动发布到知乎。宿主消息、身份验签、会话映射与发布协议仍待适配，详见 [接入说明](agent/README.md)。匿名调试 Cookie 不能替代宿主鉴权。
-- **数据兼容**：v0.2 通用上下文与旧大学版不兼容。旧数据库保留；显式使用旧数据库时，旧会话返回 `SESSION_VERSION`。
-- **输出方式**：问答提供阶段进度，圆桌创建通过 NDJSON 返回检索与组局进度；这不等于模型逐字流式输出。模型失败或降级会明确提示，付费模型请求不自动重试。
-
-## 项目文档
-
-| 文档 | 内容 |
-| --- | --- |
-| [Agent 范围](docs/AGENT_SCOPE.md) | 当前产品定位与站内适配边界；原 PRD 仅作历史背景 |
-| [详细配置](docs/CONFIGURATION.md) | 知乎 Skill 依据、动态追问、搜索质量与模型调用限制 |
-| [Agent 配置](agent/README.md) | 人设、开场白、工具映射与宿主接入点 |
-| [架构说明](docs/ARCHITECTURE.md) | 模块分工与数据流 |
-| [接口文档](docs/API.md) | 问答会话、追问与结果接口 |
-| [观点圆桌](docs/ROUNDTABLE.md) | 角色编排、讨论调度与实验边界 |
-| [演示脚本](docs/DEMO.md) | 本地演示步骤 |
-| [在线体验部署](docs/ONLINE_DEMO.md) | 全站样例、腾讯云 Docker 部署、HTTPS 与持久化 |
-| [验收状态](docs/ACCEPTANCE.md) | 已验证能力与待完成事项 |
+当前主要交付可运行的 Web 应用；知乎站内 Agent 的宿主适配与发布仍待完成。标准运行依赖单实例和持久磁盘；跨实例圆桌恢复、共享存储及额度边界见 [部署说明](docs/ONLINE_DEMO.md)。产品已更名为“探山”，现有 `WENSHAN_*` 配置名保留兼容。
