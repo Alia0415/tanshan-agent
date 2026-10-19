@@ -1,4 +1,7 @@
 import { agentJSON } from "@/lib/reading/reading-agent";
+import { getDemoSource } from "@/lib/reading/demo";
+import { isPublicDemo } from "@/lib/server/public-demo";
+import { AppError } from "@/lib/domain/validation";
 
 type MindMap = {
   thesis: string;
@@ -67,14 +70,21 @@ export async function POST(request: Request) {
     title = typeof body.title === "string" ? plainText(body.title).slice(0, 400) : "";
     excerpt = typeof body.excerpt === "string" ? plainText(body.excerpt).slice(0, 12000) : "";
     const contentId = typeof body.contentId === "string" ? body.contentId.slice(0, 200) : "";
+    if (isPublicDemo()) {
+      const source = getDemoSource(contentId);
+      if (!source) return Response.json({ error: "在线体验仅支持预置示例材料。" }, { status: 404 });
+      title = source.Title;
+      excerpt = source.ContentText;
+      if (!process.env.DEEPSEEK_API_KEY?.trim()) return Response.json({ mindMap: fallbackMindMap(title, excerpt), demo: true, generation: "preset", fallback: true });
+    }
     if (!title || !excerpt) return Response.json({ error: "缺少可用于生成思维导图的文章摘要。" }, { status: 400 });
 
-    const cacheKey = contentId + "\n" + title + "\n" + excerpt.slice(0, 240);
+    const cacheKey = String(isPublicDemo()) + "\n" + contentId + "\n" + title + "\n" + excerpt.slice(0, 240);
     const cached = mindMapCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) return Response.json({ mindMap: cached.value });
 
     const prompt = [
-      "你是问山阅读助手。请只依据给出的知乎搜索摘要，把文章压缩成一张可快速扫读的思维导图。",
+      isPublicDemo() ? "你是问山阅读助手。材料为探山原创演示摘要，非知乎内容。请只依据给出的示例摘要，把文章压缩成可快速扫读的思维导图。" : "你是问山阅读助手。请只依据给出的知乎搜索摘要，把文章压缩成一张可快速扫读的思维导图。",
       "不要补充摘要中没有出现的事实、数字、因果或作者立场；信息不足时明确写“摘要未说明”。",
       "中心 thesis 用一句话概括文章主旨，不超过40字。",
       "branches 必须正好4项，按文章真实结构组织。优先覆盖背景或问题、核心观点、论据或案例、结论或启示；label 可根据文章调整，不超过8字。",
@@ -89,8 +99,9 @@ export async function POST(request: Request) {
     for (const [key, entry] of mindMapCache) if (entry.expiresAt < Date.now()) mindMapCache.delete(key);
     if (mindMapCache.size >= 100) mindMapCache.delete(mindMapCache.keys().next().value!);
     mindMapCache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, value: mindMap });
-    return Response.json({ mindMap });
-  } catch {
+    return Response.json({ mindMap, ...(isPublicDemo() ? { demo: true, generation: "ai" } : {}) });
+  } catch (error) {
+    if (error instanceof AppError) return Response.json({ error: error.message }, { status: error.status });
     if (title && excerpt) return Response.json({ mindMap: fallbackMindMap(title, excerpt), fallback: true });
     return Response.json({ error: "思维导图暂时无法生成，请重试。" }, { status: 503 });
   }

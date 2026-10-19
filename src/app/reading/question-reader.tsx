@@ -6,6 +6,7 @@ import { readGenerationStream } from "@/lib/reading/generation-stream";
 import type { Question } from "@/lib/reading/discovery";
 import { BookmarkButton } from "@/components/bookmarks";
 import { ParticleField } from "./particle-field";
+import { useDemoMode } from "@/components/demo-mode";
 
 type Stage = "entry" | "clarifying" | "summary" | "map";
 
@@ -98,6 +99,7 @@ function RouteIcon() {
 }
 
 export default function QuestionReader({ question }: { question: Question }) {
+  const demo = useDemoMode();
   const assistantEnabled = Boolean(question.firstSeenHot);
   const mapStorageKey = `tanshan-reading-map:${question.id}`;
   const [stage, setStage] = useState<Stage>("entry");
@@ -386,7 +388,7 @@ export default function QuestionReader({ question }: { question: Question }) {
                       <strong role="status">正在为你生成阅读地图</strong>
                     </div>
                     <PercentageProgress value={generationProgress} label={generationLabel} />
-                    <p>{generationSeconds >= 60 ? "本次整理耗时较长，仍在等待结果。你可以继续等待，也可以停止等待后重试。" : "将根据你的关注点规划分类、检索知乎内容并筛选文章，完成后自动展示地图。"}</p>
+                    <p>{generationSeconds >= 60 ? "本次整理耗时较长，仍在等待结果。你可以继续等待，也可以停止等待后重试。" : demo.enabled ? (demo.aiEnabled ? "将根据你的关注点整理预置样例并生成阅读地图，不查询知乎。" : "将载入固定示例路线，展示阅读地图的结构；本次不调用 AI。") : "将根据你的关注点规划分类、检索知乎内容并筛选文章，完成后自动展示地图。"}</p>
                     <button className="text-button" type="button" onClick={() => generationRequest.current?.abort()}>停止等待</button>
                   </div>
                 )}
@@ -468,7 +470,7 @@ export default function QuestionReader({ question }: { question: Question }) {
                                       title={post.title}
                                     >
                                       <strong>{compactPostFocus(post)}</strong>
-                                      <small>{post.voteUpCount} 赞同 · 知乎 ↗</small>
+                                      <small>{demo.enabled ? "原创示例 ↗" : `${post.voteUpCount} 赞同 · 知乎 ↗`}</small>
                                     </a>
                                   </span>
                                 </div>
@@ -533,13 +535,13 @@ export default function QuestionReader({ question }: { question: Question }) {
               <button type="button" onClick={() => setSelectedPost(null)} aria-label="关闭帖子预览">×</button>
             </header>
             <div className="post-dialog-body">
-              <span className="demo-badge">知乎{selectedPost.contentType === "Article" ? "文章" : "回答"}</span>
-              <BookmarkButton corner post={selectedPost} /><h2 id="post-title">{selectedPost.title}</h2>
-              <p className="post-byline">{selectedPost.author}{selectedPost.authorBadge ? ` · ${selectedPost.authorBadge}` : ""} · {selectedPost.readTime} · {selectedPost.voteUpCount} 赞同 · {selectedPost.commentCount} 评论</p>
+              <span className="demo-badge">{demo.enabled ? "原创示例" : `知乎${selectedPost.contentType === "Article" ? "文章" : "回答"}`}</span>
+              {!demo.enabled && <BookmarkButton corner post={selectedPost} />}<h2 id="post-title">{selectedPost.title}</h2>
+              <p className="post-byline">{selectedPost.author}{selectedPost.authorBadge ? ` · ${selectedPost.authorBadge}` : ""} · {selectedPost.readTime}{!demo.enabled && ` · ${selectedPost.voteUpCount} 赞同 · ${selectedPost.commentCount} 评论`}</p>
               <section className="post-mind-map" aria-label="文章思维导图">
                 <div className="mind-map-heading">
                   <div><span>30 秒看懂</span><h3>文章思维导图</h3></div>
-                  <small>基于知乎搜索摘要生成</small>
+                  <small>{demo.enabled ? (demo.aiEnabled ? "基于原创样例生成" : "基于原创样例的本地提炼") : "基于知乎搜索摘要生成"}</small>
                 </div>
                 {selectedMindMap ? (
                   <div className="mind-map-canvas">
@@ -573,7 +575,7 @@ export default function QuestionReader({ question }: { question: Question }) {
             </div>
             <footer className="post-dialog-footer">
 
-              <a href={selectedPost.url} target="_blank" rel="noreferrer">打开知乎原文 ↗</a>
+              <a href={selectedPost.url} target="_blank" rel="noreferrer">{demo.enabled ? "查看示例全文 ↗" : "打开知乎原文 ↗"}</a>
             </footer>
           </article>
         </div>

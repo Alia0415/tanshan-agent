@@ -4,7 +4,7 @@
 
 探山把问题澄清、知乎检索、回答阅读和多立场讨论连接起来：先理解你的处境，再找到值得读的帖子；用阅读地图和文章速读整理线索，用观点圆桌看见不同立场。覆盖工作、消费、生活、人际关系、技术与学习，不限定提问领域。
 
-[页面预览](#页面预览) · [功能入口](#功能入口) · [快速开始](#快速开始) · [配置说明](#配置说明) · [开发与验证](#开发与验证) · [项目文档](#项目文档)
+[页面预览](#页面预览) · [在线体验](#在线体验) · [功能入口](#功能入口) · [快速开始](#快速开始) · [配置说明](#配置说明) · [开发与验证](#开发与验证) · [项目文档](#项目文档)
 
 > 当前提供可本地运行的 Web 应用与 Agent 核心框架，目标是接入知乎站内对话。已实现开放 API 调用和 OAuth 登录接线，**知乎站内 Agent 的注册、宿主消息适配与发布尚未完成**。具体范围见 [Agent 范围说明](docs/AGENT_SCOPE.md)。
 
@@ -24,7 +24,19 @@
 
 [![观点圆桌：夜间会场、主题切换与 Agent 库](docs/screenshots/roundtable.png)](docs/screenshots/roundtable.png)
 
+## 在线体验
+
+已提供使用原创预置样例的 AI 体验模式与 [腾讯云部署说明](docs/ONLINE_DEMO.md)，**目前尚未上线**。部署完成后，在此添加实际 HTTPS 在线体验链接，入口建议使用 `/demo`。
+
+设置 `WENSHAN_PUBLIC_DEMO=1` 后，问答、阅读和圆桌使用预置样例资料，不请求知乎或 OAuth。配置服务端 `DEEPSEEK_API_KEY` 可保留 AI 追问、总结与讨论，模型请求会产生费用；不配置则回退到完整的本地脚本样例。页面会标明样例资料，知乎登录及账号内容不可用，样例不是实时知乎数据，AI 引用也不代表事实核验。
+
+公开体验默认全站每天最多预约 **200 次 DeepSeek 上游请求**，所有访客共享，按 UTC 零点刷新；一次问题可能调用多次模型，因此不等于 200 位访客或 200 个问题。失败请求也占次数，计数随 SQLite 持久化；可通过服务端 `WENSHAN_DEMO_DAILY_AI_LIMIT` 设置有效正整数。
+
+标准模式实际接入知乎内容检索、知乎直答、DeepSeek 和知乎 OAuth。知乎资料凭证过期后，仅有 DeepSeek 仍无法提供真实知乎资料；圆桌的真实检索和生成也依赖知乎。原有 `WENSHAN_PROVIDER=demo` 仅覆盖问答，公开体验请使用全站开关。
+
 ## 功能入口
+
+下表列出标准模式的服务依赖；在线体验使用预置资料，可选接入 DeepSeek 生成。
 
 | 功能 | 可以做什么 | 本地路径 | 服务依赖 |
 | --- | --- | --- | --- |
@@ -105,7 +117,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-打开 [http://localhost:3000](http://localhost:3000)。默认 `WENSHAN_PROVIDER=demo`，未填密钥即可体验问答流程，不查询真实知乎资料，也不生成虚构来源。阅读、圆桌和我的知乎需要分别完成下方配置。
+打开 [http://localhost:3000](http://localhost:3000)。在 `.env.local` 中设置 `WENSHAN_PUBLIC_DEMO=1` 后重启服务，从 [体验说明页](http://localhost:3000/demo) 进入：配置 DeepSeek 密钥体验 AI 生成，留空则体验本地脚本样例。默认 `WENSHAN_PUBLIC_DEMO=0` 保留标准模式，原有 `WENSHAN_PROVIDER=demo` 仅提供问答规则演示；阅读、圆桌和我的知乎按下方配置接入真实服务。
 
 ## 配置说明
 
@@ -133,6 +145,8 @@ DEEPSEEK_MODEL=deepseek-flash
 
 | 变量 | 默认值 | 可选行为 |
 | --- | --- | --- |
+| `WENSHAN_PUBLIC_DEMO` | `0` | `1` 使用预置资料并关闭知乎/OAuth 请求；有 DeepSeek 密钥时保留 AI 生成，否则本地脚本回退 |
+| `WENSHAN_DEMO_DAILY_AI_LIMIT` | `200` | 公开体验的全站每日上游请求次数，UTC 零点刷新，必须为有效正整数；正式模式不生效 |
 | `WENSHAN_PROVIDER` | `demo` | `live` 使用真实知乎资料 |
 | `WENSHAN_CLARIFICATION_MODE` | `auto` | `local` 使用本地规则；`deepseek` 强制模型追问并要求密钥 |
 | `WENSHAN_SEARCH_MODE` | `auto` | `basic` 使用基础关键词检索；`deepseek` 尝试模型优化 |
@@ -141,7 +155,7 @@ DEEPSEEK_MODEL=deepseek-flash
 | `ZHIHU_TIMEOUT_MS` | `120000` | 知乎请求超时，单位毫秒 |
 | `WENSHAN_DB_PATH` | `.data/wenshan-agent-v2.sqlite` | SQLite 持久化路径 |
 
-`auto` 模式根据是否配置 DeepSeek 密钥选择行为。若要让问答演示和 HTTP smoke 不调用外部模型，同时设置 `WENSHAN_PROVIDER=demo` 与 `WENSHAN_CLARIFICATION_MODE=local`。
+`auto` 模式优先使用已配置的 DeepSeek，否则可回退到知乎助手。若仅验证旧问答演示和 HTTP smoke，可同时设置 `WENSHAN_PROVIDER=demo` 与 `WENSHAN_CLARIFICATION_MODE=local`；公开全站样例使用 `WENSHAN_PUBLIC_DEMO=1`。
 
 ### 配置知乎 OAuth（可选）
 
@@ -200,12 +214,16 @@ GitHub Actions 在 push 和 PR 时运行 `npm ci`、`npm run check` 与 `npm run
 
 当前使用**单个 Node.js 实例与持久磁盘**。多副本或临时磁盘 Serverless 部署需要共享存储和持久任务队列。阅读热榜记录存放在 `.data/questions.json`，部署时也应保留 `.data`。
 
+在线 AI 体验推荐使用 [Compose 模板](deploy/compose.demo.yml)，通过 [环境变量示例](deploy/demo.env.example) 配置可选的 DeepSeek 密钥。应用仅绑定到 `127.0.0.1:3000`，再通过 HTTPS 反向代理公开访问。完整步骤、健康检查与 Nginx 模板见 [在线体验部署](docs/ONLINE_DEMO.md)。这需要运行 Node.js 服务，不能作为纯静态站点部署。
+
+标准模式的基础 Docker 启动方式：
+
 ```sh
 docker build -t tanshan-agent .
 docker run -d --name tanshan -p 3000:3000 --env-file .env.local -v wenshan-data:/app/.data tanshan-agent
 ```
 
-生产 Cookie 使用 Secure，应通过 HTTPS 反向代理访问。运行环境需能访问知乎及所配置的模型 API，否则页面可打开，但无法读取真实内容。
+生产 Cookie 使用 Secure，应通过 HTTPS 反向代理访问。标准模式运行环境需能访问知乎及所配置的模型 API；在线体验的 AI 生成只需访问 DeepSeek，未配置密钥时使用本地脚本。恢复知乎凭证后，关闭 `WENSHAN_PUBLIC_DEMO`，切回 `WENSHAN_PROVIDER=live`，重启服务并新建会话。
 
 - **站内接入**：Docker 部署不会自动发布到知乎。宿主消息、身份验签、会话映射与发布协议仍待适配，详见 [接入说明](agent/README.md)。匿名调试 Cookie 不能替代宿主鉴权。
 - **数据兼容**：v0.2 通用上下文与旧大学版不兼容。旧数据库保留；显式使用旧数据库时，旧会话返回 `SESSION_VERSION`。
@@ -222,4 +240,5 @@ docker run -d --name tanshan -p 3000:3000 --env-file .env.local -v wenshan-data:
 | [接口文档](docs/API.md) | 问答会话、追问与结果接口 |
 | [观点圆桌](docs/ROUNDTABLE.md) | 角色编排、讨论调度与实验边界 |
 | [演示脚本](docs/DEMO.md) | 本地演示步骤 |
+| [在线体验部署](docs/ONLINE_DEMO.md) | 全站样例、腾讯云 Docker 部署、HTTPS 与持久化 |
 | [验收状态](docs/ACCEPTANCE.md) | 已验证能力与待完成事项 |

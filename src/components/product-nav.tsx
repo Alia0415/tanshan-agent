@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { ZhihuAccountButton } from "./zhihu-account";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useDemoMode } from "./demo-mode";
 
 const products = [
   { href: "/", label: "Agent 问答" },
@@ -12,6 +13,7 @@ const products = [
 ];
 
 export function ProductNav() {
+  const demo = useDemoMode();
   const pathname = usePathname();
   const isAgentRoute = pathname === "/";
   const navRef = useRef<HTMLElement>(null);
@@ -75,7 +77,7 @@ export function ProductNav() {
           {item.label}
         </Link>
       ))}
-      <ZhihuAccountButton />
+      {demo.enabled ? <Link className="zhihu-account" href="/demo">{demo.aiEnabled ? "AI 体验 · 样例资料" : "样例体验 · 未启用 AI"}</Link> : <ZhihuAccountButton />}
     </nav>
   );
 }

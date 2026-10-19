@@ -34,6 +34,7 @@ import { AnswerCard } from "./answer-card";
 import { WaveProgressFloat } from "./wave-progress";
 import { SearchProgress } from "./search-progress";
 import homeStyles from "./workspace-home.module.css";
+import { useDemoMode } from "./demo-mode";
 
 type Result = { session: Session; auto_answer?: boolean };
 const STORAGE_KEY = "wenshan.agent-session-v2";
@@ -146,6 +147,12 @@ function remember(id?: string) {
 }
 
 export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }) {
+  const demo = useDemoMode();
+  const visibleExamples = demo.enabled ? [
+    { icon: Camera, category: "相机选择", text: "第一台相机如何按拍摄场景选择？", lines: ["第一台相机，", "怎么选？"], hint: "体验拍摄场景与预算取舍" },
+    { icon: GraduationCap, category: "AI 学习", text: "如何把 AI 工具用进自己的学习流程？", lines: ["把 AI 工具用进", "学习流程"], hint: "体验自测、复述与资料核验" },
+    { icon: BriefcaseBusiness, category: "转岗验证", text: "转岗前如何用小项目验证职业方向？", lines: ["转岗前，如何", "验证方向？"], hint: "体验小项目与适用边界" },
+  ] : examples;
   const [session, setSession] = useState<Session | null>(null);
   const [question, setQuestion] = useState(initialQuestion);
   const [context, setContext] = useState<Context>(emptyContext);
@@ -654,9 +661,9 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
             <MoreHorizontal size={16} aria-hidden="true" />
           </button>
           <BookmarkLibraryButton />
-          <Link className="side-user" href="/me">
+          <Link className="side-user" href={demo.enabled ? "/demo" : "/me"}>
             <Image className="side-avatar zhihu" src="/zhihu-official.ico" alt="" width={20} height={20} unoptimized />
-            <span className="side-user-name">我的知乎</span>
+            <span className="side-user-name">{demo.enabled ? "在线体验说明" : "我的知乎"}</span>
             <ArrowRight size={15} aria-hidden="true" />
           </Link>
         </div>
@@ -877,7 +884,7 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
 
                 </div>
                 <div className={homeStyles.questionCards}>
-                  {examples.map((example) => {
+                  {visibleExamples.map((example) => {
                     const Icon = example.icon;
                     return (
                       <button
@@ -929,7 +936,7 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
               {session.provider === "demo" && (
                 <div className="demo-note">
                   <Sparkles size={14} />
-                  当前为演示模式，回答仅展示一般性分析框架。
+                  {demo.enabled ? (demo.aiEnabled ? "AI 根据你的条件整理预置样例；样例不代表实时知乎资料。" : "当前使用样例和本地规则演示，尚未启用 AI。") : "当前为演示模式，回答仅展示一般性分析框架。"}
                 </div>
               )}
               {historyAnswer ? null : session.stage === "clarifying" && session.clarification ? (
@@ -1203,7 +1210,7 @@ export function Workspace({ initialQuestion = "" }: { initialQuestion?: string }
               探山根据你的具体问题和补充，判断还需要了解什么。最多追问 {MAX_CLARIFICATION_ROUNDS} 轮，信息足够就开始回答，也可以随时跳过。
             </p>
             <p>
-              连接真实资料后，每次回答会展示可检查的来源。演示模式仅展示交互与一般性分析框架。
+              {demo.enabled ? "在线体验使用原创样例库。配置 DeepSeek 后提供 AI 追问与整理，未配置时展示本地分析框架；均不查询实时知乎资料。" : "连接真实资料后，每次回答会展示可检查的来源。演示模式仅展示交互与一般性分析框架。"}
             </p>
             <div className="about-privacy">
               <ShieldCheck size={19} />

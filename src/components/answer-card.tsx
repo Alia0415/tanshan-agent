@@ -63,7 +63,8 @@ export function AnswerCard({
   ) => Promise<void>;
 }) {
   const [editingTag, setEditingTag] = useState<string | null>(null);
-  const posts = filterZhihuPosts(answer.sources);
+  const demo = answer.evidence === "demo";
+  const posts = demo ? answer.sources.filter(source => source.content_id.startsWith("demo-") && /^\/demo#demo-[a-z0-9-]+$/.test(source.url)) : filterZhihuPosts(answer.sources);
   const legacyOutsideSources = posts.length !== answer.sources.length;
   const [feedback, setFeedback] = useState<"helpful" | "irrelevant" | null>(
     null,
@@ -154,12 +155,12 @@ export function AnswerCard({
         <ConditionEditor key={editingTag} label={editingTag} answerId={answer.id} sources={answer.condition_sources} history={clarificationHistory}
           busy={busy} onLoadChoices={onLoadChoices} onSave={onEditCondition} onCancel={() => setEditingTag(null)} />
       )}
-      <section className="sources post-results" aria-label="知乎帖子列表">
+      <section className="sources post-results" aria-label={demo ? "预置样例资料" : "知乎帖子列表"}>
         <h2 className="posts-heading">
-          为你找到的知乎帖子 <span>{posts.length}</span>
+          {demo ? "匹配的预置样例" : "为你找到的知乎帖子"} <span>{posts.length}</span>
         </h2>
         <p className="posts-hint">
-          {answer.search_info?.strategy === "fallback"
+          {demo ? "以下为探山原创演示材料，非真实知乎帖子；点击可以查看样例全文。" : answer.search_info?.strategy === "fallback"
             ? "本次检索优化未全部完成，候选帖子是否适用还需核对。"
             : answer.search_info?.reviewed
               ? "已结合你的问题和补充筛选，相关性相近时参考互动量与更新时间排序。相关性由 AI 根据摘要判断，具体信息请核对原文。"
@@ -185,8 +186,8 @@ export function AnswerCard({
                     <div>
                       <strong>{source.title}</strong>
                       <p>
-                        知乎 · {source.author || "作者未提供"} ·{" "}
-                        {source.type.toLowerCase() === "answer"
+                        {demo ? "原创样例" : "知乎"} · {source.author || "作者未提供"} ·{" "}
+                        {demo ? "演示材料" : source.type.toLowerCase() === "answer"
                           ? "回答"
                           : source.type.toLowerCase() === "article"
                             ? "文章"
@@ -208,9 +209,9 @@ export function AnswerCard({
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      打开知乎原帖 <ArrowUpRight size={15} />
+                      {demo ? "查看示例材料" : "打开知乎原帖"} <ArrowUpRight size={15} />
                     </a>
-                    <button
+                    {!demo && <button
                       type="button"
                       className={`resonance-trigger${connectedCount ? " connected" : ""}`}
                       aria-label={`连接这段经历：${source.title}`}
@@ -218,10 +219,10 @@ export function AnswerCard({
                     >
                       <Link2 size={14} />
                       {connectedCount ? `已连接 · ${connectedCount}` : "连接"}
-                    </button>
+                    </button>}
                   </div>
                 </article>
-                <BookmarkButton
+                {!demo && <BookmarkButton
                   corner
                   post={{
                     url: source.url,
@@ -229,7 +230,7 @@ export function AnswerCard({
                     author: source.author || "",
                     excerpt: previewExcerpt(source),
                   }}
-                />
+                />}
               </div>
             );
           })
@@ -247,7 +248,7 @@ export function AnswerCard({
         </p>
       ) : answer.format !== "source_excerpts" ? (
         <details className="ai-summary" open={answer.evidence === "demo"}>
-          <summary>AI 辅助总结</summary>
+          <summary>{answer.demo_generation === "local" ? "本地演示分析框架" : "AI 辅助总结"}</summary>
           <p className="answer-summary">
             {answer.summary}
             <Citations ids={answer.summary_citations} answer={answer} />

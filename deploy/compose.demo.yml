@@ -1,0 +1,40 @@
+name: tanshan-demo
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      WENSHAN_PUBLIC_DEMO: "1"
+      WENSHAN_DEMO_DAILY_AI_LIMIT: ${WENSHAN_DEMO_DAILY_AI_LIMIT-200}
+      WENSHAN_PROVIDER: demo
+      WENSHAN_CLARIFICATION_MODE: auto
+      WENSHAN_SEARCH_MODE: basic
+      WENSHAN_DB_PATH: /app/.data/wenshan-demo.sqlite
+      ZHIHU_ACCESS_SECRET: ""
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
+      ZHIHU_OAUTH_APP_ID: ""
+      ZHIHU_OAUTH_APP_KEY: ""
+      ZHIHU_OAUTH_REDIRECT_URI: ""
+      ZHIHU_APP_ID: ""
+      ZHIHU_APP_KEY: ""
+    volumes:
+      - demo-data:/app/.data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(async r => { const b = await r.json(); if (!r.ok || b.status !== 'ok' || b.mode !== 'demo') process.exit(1); }).catch(() => process.exit(1));"
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+volumes:
+  demo-data:

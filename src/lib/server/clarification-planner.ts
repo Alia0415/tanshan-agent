@@ -3,6 +3,7 @@ import { MAX_CLARIFICATION_ROUNDS, type ClarificationCard, type Session } from "
 import { AppError } from "../domain/validation";
 import { nextCard } from "../domain/clarification";
 import { modelJson, modelJsonAvailable } from "./deepseek";
+import { isPublicDemo } from "./public-demo";
 
 export type ClarificationPlanner = (session: Session) => Promise<ClarificationCard | undefined>;
 
@@ -57,6 +58,7 @@ export function parseClarificationPlan(content: string): ClarificationCard | und
 
 export const planClarification: ClarificationPlanner = async (session) => {
   if (shouldStopClarifying(session)) return;
+  if (isPublicDemo() && !process.env.DEEPSEEK_API_KEY?.trim()) return nextCard(session);
   const mode = process.env.WENSHAN_CLARIFICATION_MODE || "auto";
   if (!["auto", "local", "deepseek"].includes(mode))
     throw new AppError("CONFIGURATION", "追问模式配置无效。", 503);

@@ -1,4 +1,5 @@
 import { hotCatalog, readCatalog, searchQuestions } from "@/lib/reading/discovery";
+import { isPublicDemo } from "@/lib/server/public-demo";
 export async function GET(request: Request) {
   const query = new URL(request.url).searchParams.get("q")?.trim();
   if (query && query.length > 120) return Response.json({error: "搜索词请控制在 120 字内。"}, {status: 400});
@@ -8,7 +9,7 @@ export async function GET(request: Request) {
     const questions = query ? await searchQuestions(query) : historical
       ? Object.values(catalog.questions).filter(question => question.firstSeenHot)
       : catalog.hotIds.map(id => catalog.questions[id]);
-    return Response.json({questions, updatedAt: catalog.updatedAt}, {headers: {"Cache-Control": "no-store"}});
+    return Response.json({questions, updatedAt: catalog.updatedAt, ...(isPublicDemo() ? { demo: true, source: "原创预置示例，非实时知乎热榜或搜索" } : {})}, {headers: {"Cache-Control": "no-store"}});
   } catch (error) {
     const message = error instanceof Error && error.message.startsWith("知乎") || error instanceof Error && error.message.startsWith("暂时无法连接知乎") ? error.message : "暂时无法获取问题，请稍后重试。";
     return Response.json({error: message}, {status: 503});

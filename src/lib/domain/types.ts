@@ -86,6 +86,7 @@ export interface Answer {
   queries: string[];
   search_info?: SearchInfo;
   evidence: "demo" | "sources" | "insufficient" | "unverified";
+  demo_generation?: "ai" | "local";
   created_at: string;
 }
 export interface Session {

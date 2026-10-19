@@ -4,6 +4,7 @@ import { type DragEvent, useEffect, useRef, useState } from 'react';
 import type { Roundtable } from '@/lib/roundtable/engine';
 import './room-stage.css';
 import { displayClaim } from '@/lib/roundtable/brief';
+import { useDemoMode } from '@/components/demo-mode';
 
 export const TURN_MS = 16000;
 const seats = [
@@ -300,6 +301,7 @@ export function RoomStage({
   onJoinGuest: (id: string) => Promise<boolean>;
   canJoinGuest: boolean;
 }) {
+  const demo = useDemoMode();
   const [clock, setClock] = useState(0);
   const [playhead, setPlayhead] = useState({ message: '', elapsed: 0 });
   const time = useRef({ message: '', elapsed: 0, last: 0 });
@@ -623,7 +625,7 @@ export function RoomStage({
           {round.messages.length > 0 && ` · 第 ${visible} 条发言`}
         </span>
         <p>
-          {message?.content ?? '观点角色将根据真实知乎资料生成，发起后在这里入席。'}
+          {message?.content ?? (demo.enabled ? '观点角色将围绕原创样例讨论，发起后在这里入席。' : '观点角色将根据真实知乎资料生成，发起后在这里入席。')}
         </p>
       </div>
     </section>

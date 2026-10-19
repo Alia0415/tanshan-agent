@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { AppError } from "../domain/validation";
 import { assertUpstreamUrl } from "./upstream";
+import { isPublicDemo } from "./public-demo";
+import { reserveDemoAiCall } from "./demo-budget";
 
-type Feature = "CLARIFICATION" | "SEARCH" | "READING";
+type Feature = "CLARIFICATION" | "SEARCH" | "READING" | "ANSWER";
 type ModelOptions = {
   feature: Feature;
   instructions: string;
@@ -11,7 +13,7 @@ type ModelOptions = {
   timeoutMs?: number;
 };
 const labelOf = (feature: Feature) =>
-  feature === "CLARIFICATION" ? "追问" : feature === "READING" ? "阅读整理" : "搜索优化";
+  feature === "CLARIFICATION" ? "追问" : feature === "READING" ? "阅读整理" : feature === "ANSWER" ? "回答整理" : "搜索优化";
 
 // Zhihu's fast assistant model stands in when no DeepSeek key is configured so
 // clarification and search planning stay model-driven instead of rule cards.
@@ -19,6 +21,7 @@ const ZHIHU_ASSIST_MODEL = "zhida-fast-1p5";
 
 /** True when some model can serve JSON tasks (DeepSeek preferred, Zhihu fallback). */
 export function modelJsonAvailable() {
+  if (isPublicDemo()) return Boolean(process.env.DEEPSEEK_API_KEY?.trim());
   return Boolean(
     process.env.DEEPSEEK_API_KEY?.trim() || process.env.ZHIHU_ACCESS_SECRET?.trim(),
   );
@@ -37,6 +40,7 @@ export async function deepseekJson(options: ModelOptions): Promise<string> {
     new AppError(`${options.feature}_${suffix}`, message, status);
   const key = process.env.DEEPSEEK_API_KEY?.trim();
   if (!key) throw fail("AUTH", "请在服务端配置 DeepSeek API Key 后重试。", 503);
+  reserveDemoAiCall();
   let result: unknown;
   try {
     const response = await fetch(assertUpstreamUrl("https://api.deepseek.com/chat/completions"), {

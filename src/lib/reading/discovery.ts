@@ -2,10 +2,12 @@ import "server-only";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { assertUpstreamUrl } from "@/lib/server/upstream";
+import { isPublicDemo } from "@/lib/server/public-demo";
+import { DEMO_TOPICS, demoSearchItems, getDemoTopic, searchDemoTopics } from "./demo";
 
 export type Question = {
   id: string; title: string; url: string; summary: string;
-  firstSeenHot?: string; lastSeenHot?: string; rank?: number;
+  firstSeenHot?: string; lastSeenHot?: string; rank?: number; demo?: boolean;
 };
 type Catalog = { updatedAt: number; questions: Record<string, Question>; hotIds: string[] };
 const file = path.join(process.cwd(), ".data", "questions.json");
@@ -22,6 +24,7 @@ export function questionId(url: unknown): string | undefined {
   } catch { return; }
 }
 export async function api<T>(endpoint: string): Promise<T> {
+  if (isPublicDemo()) throw new Error("在线体验使用原创示例，未连接知乎服务。");
   const secret = process.env.ZHIHU_ACCESS_SECRET;
   if (!secret) throw new Error("知乎服务尚未配置，请联系维护者。");
   const response = await fetch(assertUpstreamUrl("https://developer.zhihu.com" + endpoint), {
@@ -34,6 +37,10 @@ export async function api<T>(endpoint: string): Promise<T> {
   return body.Data as T;
 }
 export async function readCatalog(): Promise<Catalog> {
+  if (isPublicDemo()) {
+    const questions = Object.fromEntries(DEMO_TOPICS.map(topic => [topic.id, demoQuestion(topic.id)!]));
+    return { updatedAt: 0, questions, hotIds: DEMO_TOPICS.map(topic => topic.id) };
+  }
   try { return JSON.parse(await readFile(file, "utf8")); }
   catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
@@ -51,6 +58,7 @@ async function updateCatalog(update: (value: Catalog) => void) {
   await task;
 }
 export async function hotCatalog(): Promise<Catalog> {
+  if (isPublicDemo()) return readCatalog();
   const cached = await readCatalog();
   if (Date.now() - cached.updatedAt < 5 * 60000) return cached;
   if (!hotPending) hotPending = (async () => {
@@ -77,6 +85,7 @@ export async function hotCatalog(): Promise<Catalog> {
 type SearchItem = {Title: string; Url: string; ContentText: string; AuthorName: string; VoteUpCount: number; ContentType: string};
 const searches = new Map<string, {until: number; promise: Promise<SearchItem[]>}>();
 export async function search(query: string) {
+  if (isPublicDemo()) return demoSearchItems(query);
   const existing = searches.get(query);
   if (existing && existing.until > Date.now()) return existing.promise;
   const promise = api<{Items: SearchItem[]}>("/api/v1/content/zhihu_search?" + new URLSearchParams({Query: query, Count: "10"}))
@@ -87,6 +96,7 @@ export async function search(query: string) {
   return promise;
 }
 export async function searchQuestions(query: string) {
+  if (isPublicDemo()) return searchDemoTopics(query).map(topic => demoQuestion(topic.id)!);
   const items = await search(query);
   const ids = [...new Set(items.map(item => questionId(item.Url)).filter((id): id is string => !!id))];
   await updateCatalog(data => {
@@ -100,7 +110,14 @@ export async function searchQuestions(query: string) {
   return ids.map(id => catalog.questions[id]);
 }
 export async function getQuestion(id: string) {
+  if (isPublicDemo()) return demoQuestion(id);
   if (!/^\d+$/.test(id)) return undefined;
   return (await readCatalog()).questions[id];
 }
 export function eligible(question: Question) { return Boolean(question.firstSeenHot); }
+
+function demoQuestion(id: string): Question | undefined {
+  const topic = getDemoTopic(id);
+  if (!topic) return undefined;
+  return { id: topic.id, title: topic.title, summary: topic.summary, url: `/demo#${topic.id}`, demo: true, firstSeenHot: "demo" };
+}

@@ -1,4 +1,5 @@
 import { AppError } from "../domain/validation";
+import { isPublicDemo } from "./public-demo";
 
 // Every outbound server request must target one of these upstreams over HTTPS.
 const ALLOWED_HOSTS = new Set([
@@ -20,6 +21,8 @@ export function assertUpstreamUrl(input: string): string {
     throw new AppError("UPSTREAM_URL", "上游地址无效。", 500);
   }
   const host = url.hostname.toLowerCase();
+  if (isPublicDemo() && host !== "api.deepseek.com")
+    throw new AppError("PUBLIC_DEMO_OFFLINE", "在线体验使用预置样例，知乎接口已关闭。", 503);
   if (
     url.protocol !== "https:" ||
     url.username ||

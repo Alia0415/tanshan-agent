@@ -5,6 +5,8 @@ import { LoaderCircle, Send, Sparkles } from "lucide-react";
 import { displayClaim } from "@/lib/roundtable/brief";
 import type { Roundtable, RoundtableSummary } from "@/lib/roundtable/engine";
 import type { PreviewSource } from "@/lib/roundtable/start-stream";
+import { useDemoMode } from "@/components/demo-mode";
+import { DEMO_TOPICS } from "@/lib/reading/demo";
 
 const phaseDividers: Record<string, string> = {
   opening: "圆桌开场",
@@ -277,6 +279,7 @@ export function WeChatIntro({
   onResume?: (id: string) => void;
 }) {
   const [elapsed, setElapsed] = useState(0);
+  const demo = useDemoMode();
   const loading = Boolean(busy);
   useEffect(() => {
     if (!loading) return;
@@ -288,7 +291,7 @@ export function WeChatIntro({
     <div className="wechat-phone">
       <header className="wechat-header">
         <span className="wechat-header-title">观点圆桌</span>
-        <span className="wechat-header-sub">需要配置知乎凭证后开局</span>
+        <span className="wechat-header-sub">{demo.enabled ? (demo.aiEnabled ? "DeepSeek × 原创样例" : "原创样例 × 本地脚本") : "需要配置知乎凭证后开局"}</span>
       </header>
       <div className="wechat-body wechat-intro">
         <Sparkles size={30} className="wechat-intro-icon" />
@@ -296,11 +299,11 @@ export function WeChatIntro({
           <span className="copy-desktop">把一个问题交给几个立场</span>
           <span className="copy-mobile">跟不同观点的代表谈谈</span>
         </h3>
-        <p>真实检索知乎帖子，生成不同立场的 Agent 开一场可插话的圆桌。</p>
+        <p>{demo.enabled ? "围绕预置原创样例，让不同立场展开可插话的讨论。材料与角色不代表真实知乎用户。" : "真实检索知乎帖子，生成不同立场的 Agent 开一场可插话的圆桌。"}</p>
         <div className="wechat-examples" role="group" aria-label="示例问题">
           <p className="wechat-examples-title">试试这些问题</p>
           <div className="wechat-examples-grid">
-            {EXAMPLE_QUESTIONS.map((item) => (
+            {(demo.enabled ? DEMO_TOPICS.map(topic => topic.title) : EXAMPLE_QUESTIONS).map((item) => (
               <button
                 key={item}
                 type="button"
@@ -337,12 +340,12 @@ export function WeChatIntro({
             <div className="wechat-start-progress-track" role="progressbar" aria-label={busy}>
               <span className="wechat-start-progress-fill" />
             </div>
-            <p className="wechat-start-progress-hint">已等待 {elapsed} 秒 · {sources.length ? "检索已完成，可先阅读下方资料" : "正在查找相关帖子"}</p>
+            <p className="wechat-start-progress-hint">已等待 {elapsed} 秒 · {demo.enabled ? "正在根据预置样例组织讨论" : sources.length ? "检索已完成，可先阅读下方资料" : "正在查找相关帖子"}</p>
             {elapsed >= 30 && <p className="wechat-start-progress-hint">{sources.length ? "模型还在整理观点与开场白，请稍候。" : "资料服务响应较慢，请稍候。"}无需重复提交。</p>}
           </div>
         )}
         {sources.length > 0 && <details className="wechat-start-sources" open>
-          <summary>已找到的真实资料 · {sources.length} 条</summary>
+          <summary>{demo.enabled ? "本场使用的原创样例" : "已找到的真实资料"} · {sources.length} 条</summary>
           {sources.map((source) => <a key={source.id} href={source.url} target="_blank" rel="noreferrer">{source.title} ↗</a>)}
         </details>}
         {!busy && recent.length > 0 && onResume && (

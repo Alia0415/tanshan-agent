@@ -1,4 +1,5 @@
 import { isZhihuPost } from "../domain/sources";
+import { isPublicDemo } from "./public-demo";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -105,7 +106,7 @@ export function listSessions(token: string): SessionSummary[] {
   const rows = db().prepare("SELECT data FROM sessions WHERE owner = ? AND expires > ?")
     .all(ownerHash(token), Date.now()) as { data: string }[];
   return rows.map((row) => JSON.parse(row.data) as Session)
-    .filter((session) => session.schema_version === 2 && session.answers.some((answer) => answer.sources.some(isZhihuPost)))
+    .filter((session) => session.schema_version === 2 && (isPublicDemo() ? session.provider === "demo" : session.answers.some((answer) => answer.sources.some(isZhihuPost))))
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .map(({ session_id, original_question, stage, created_at }) => ({
       session_id, original_question, stage, created_at,

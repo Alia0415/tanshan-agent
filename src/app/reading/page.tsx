@@ -4,6 +4,7 @@ import Image from "next/image";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import type { Question } from "@/lib/reading/discovery";
+import { useDemoMode } from "@/components/demo-mode";
 
 type AnswerSummary = { url: string; author: string; excerpt: string; votes: number };
 type AnswerState = { loading: boolean; error: string; answers: AnswerSummary[] };
@@ -12,6 +13,7 @@ const AUTO_ADVANCE_MS = 9000;
 // 行高由 CSS 变量 --moon-line-h 决定（桌面 96px 一屏 5 行，手机更紧凑），位移公式与之联动
 
 export default function Home() {
+  const demo = useDemoMode();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [query, setQuery] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -75,17 +77,17 @@ export default function Home() {
   return <div className="app-shell moon-page">
     <header className="topbar"><div className="topbar-inner">
       <Link className="brand" href="/reading"><span className="zhihu-word">知乎</span><span className="brand-divider"/><span className="tanshan-word">探山</span></Link>
-      <form className="discovery-search" onSubmit={submit}><input aria-label="搜索知乎问题" placeholder="搜索你感兴趣的问题" value={query} maxLength={120} onChange={e => setQuery(e.target.value)}/><button type="submit">搜索</button></form>
+      <form className="discovery-search" onSubmit={submit}><input aria-label={demo.enabled ? "搜索示例主题" : "搜索知乎问题"} placeholder={demo.enabled ? "搜索相机、AI 学习或转岗" : "搜索你感兴趣的问题"} value={query} maxLength={120} onChange={e => setQuery(e.target.value)}/><button type="submit">搜索</button></form>
       <span className="home-label">发现问题</span>
     </div></header>
     <main className="moon-stage" aria-label="热点问题唱片机">
       <section className="moon-lyrics" aria-label="热点问题列表">
         <div className="moon-filter">
-          <button className={!searchTerm && view === "hot" ? "selected" : ""} onClick={() => {setQuery(""); browse("");}}>知乎热榜</button>
-          <button className={"moon-filter-history" + (!searchTerm && view === "history" ? " selected" : "")} onClick={() => {setQuery(""); browse("", "history");}}>曾经上榜</button>
+          <button className={!searchTerm && view === "hot" ? "selected" : ""} onClick={() => {setQuery(""); browse("");}}>{demo.enabled ? "示例主题" : "知乎热榜"}</button>
+          <button className={"moon-filter-history" + (!searchTerm && view === "history" ? " selected" : "")} onClick={() => {setQuery(""); browse("", "history");}}>{demo.enabled ? "样例目录" : "曾经上榜"}</button>
           {searchTerm && <strong>搜索：{searchTerm}</strong>}
         </div>
-        {loading ? <p className="moon-notice" role="status">正在加载真实知乎问题…</p>
+        {loading ? <p className="moon-notice" role="status">{demo.enabled ? "正在加载预置样例…" : "正在加载真实知乎问题…"}</p>
           : error ? <div className="moon-notice" role="alert"><p>{error}</p><button onClick={() => browse(searchTerm, view)}>重试</button></div>
           : questions.length === 0 ? <p className="moon-notice">没有找到问题，换一个关键词试试。</p>
           : <div className="moon-lyrics-window">
@@ -120,7 +122,7 @@ export default function Home() {
 
       <section className="moon-answer" aria-label="当前问题的第一条回复">
         {current ? <>
-          <span className="moon-answer-kicker">{searchTerm ? "知乎问题" : view === "history" ? "曾被探山记录在榜" : `热榜第 ${current.rank ?? "—"} 位`} · 知乎问题</span>
+          <span className="moon-answer-kicker">{demo.enabled ? "原创示例 · 非实时热榜" : `${searchTerm ? "知乎问题" : view === "history" ? "曾被探山记录在榜" : `热榜第 ${current.rank ?? "—"} 位`} · 知乎问题`}</span>
           <h2><Link prefetch={false} href={"/reading/question/" + current.id}>{current.title}</Link></h2>
           {answerState?.loading ? <p className="moon-answer-hint">正在取来第一条回复……</p>
             : answerState?.error ? <p className="moon-answer-hint moon-answer-error">{answerState.error}</p>
@@ -131,10 +133,10 @@ export default function Home() {
             </>}
           <div className="moon-answer-actions">
             <Link prefetch={false} className="moon-answer-cta" href={"/reading/question/" + current.id}>进入问题，查看全部回答 →</Link>
-            <a className="moon-answer-origin" href={current.url} target="_blank" rel="noreferrer">在知乎打开原文 ↗</a>
+            <a className="moon-answer-origin" href={current.url} target="_blank" rel="noreferrer">{demo.enabled ? "查看示例资料 ↗" : "在知乎打开原文 ↗"}</a>
           </div>
-        </> : <p className="moon-answer-hint">{loading ? "正在加载知乎热榜…" : "没有找到问题"}</p>}
-        <small className="moon-answer-footnote">内容来自知乎 · 探山阅读</small>
+        </> : <p className="moon-answer-hint">{loading ? (demo.enabled ? "正在加载示例主题…" : "正在加载知乎热榜…") : "没有找到问题"}</p>}
+        <small className="moon-answer-footnote">{demo.enabled ? "探山原创样例 · 仅用于体验流程" : "内容来自知乎 · 探山阅读"}</small>
       </section>
     </main>
   </div>;

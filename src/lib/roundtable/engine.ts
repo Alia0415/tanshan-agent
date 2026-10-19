@@ -49,7 +49,7 @@ export interface Roundtable {
   question: string;
   createdAt: string;
   expiresAt: string;
-  provider: "live";
+  provider: "live" | "demo";
   model: string | null;
   // Sources are embedded so knowledge bases stay intact across restarts;
   // only their ids appear in citations.

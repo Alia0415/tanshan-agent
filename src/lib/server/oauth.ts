@@ -1,4 +1,5 @@
 import { assertUpstreamUrl } from "./upstream";
+import { isPublicDemo } from "./public-demo";
 import { zhihuDeployment } from "./zhihu-deployment";
 import { DatabaseSync } from "node:sqlite";
 import { randomBytes } from "node:crypto";
@@ -8,6 +9,7 @@ import { safeWebUrl, type ZhihuUser } from "../domain/zhihu-user";
 
 export type OAuthConfig = { configured: boolean; appId: string; appKey: string; redirectUri: string };
 export function oauthConfig(): OAuthConfig {
+  if (isPublicDemo()) return { configured: false, appId: "", appKey: "", redirectUri: "" };
   const appId = process.env.ZHIHU_OAUTH_APP_ID?.trim() || process.env.ZHIHU_APP_ID?.trim() || zhihuDeployment.appId;
   const appKey = process.env.ZHIHU_OAUTH_APP_KEY?.trim() || process.env.ZHIHU_APP_KEY?.trim() || zhihuDeployment.appKey;
   const redirectUri = process.env.ZHIHU_OAUTH_REDIRECT_URI?.trim() || zhihuDeployment.redirectUri;
@@ -89,6 +91,7 @@ export function saveOAuthSession(visitor: string, token: string, expiresIn: numb
     .run(visitor, token, Date.now() + Math.min(expiresIn, 86400) * 1000, profile ? JSON.stringify(profile) : null);
 }
 export function getOAuthSession(visitor: string) {
+  if (isPublicDemo()) return;
   ensureTable();
   db().prepare("DELETE FROM oauth_sessions WHERE expires_at <= ?").run(Date.now());
   const row = db().prepare("SELECT access_token, expires_at, profile FROM oauth_sessions WHERE visitor = ?").get(visitor) as OAuthRow | undefined;

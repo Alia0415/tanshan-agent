@@ -15,6 +15,14 @@ import {
 } from "../roundtable/engine";
 import { db, ownerHash } from "./store";
 import { deduplicate, request, ZhihuProvider, type KnowledgeProvider } from "./providers";
+import { deepseekJson } from "./deepseek";
+import { isPublicDemo } from "./public-demo";
+import {
+  demoRoundtableInstructions,
+  demoRoundtableSources,
+  labelDemoRoundtable,
+  scriptedDemoRoundtableModel,
+} from "../roundtable/demo";
 
 type Row = { data: string; owner: string; expires: number };
 const state = globalThis as unknown as { tanshanRounds?: boolean };
@@ -43,7 +51,14 @@ function load(id: string, token: string): Roundtable {
       "这场圆桌不存在或已过期，请重新发起。",
       404,
     );
-  return JSON.parse(row.data) as Roundtable;
+  const round = JSON.parse(row.data) as Roundtable;
+  if (round.provider !== (isPublicDemo() ? "demo" : "live"))
+    throw new AppError(
+      "ROUNDTABLE_MODE_CHANGED",
+      "这场圆桌属于其他运行模式，请重新发起一场圆桌。",
+      409,
+    );
+  return round;
 }
 function save(round: Roundtable, token: string) {
   db()
@@ -137,6 +152,28 @@ const zhihuModel: ModelJson = async (prompt, payload) => {
   }
 };
 
+function currentModel(model: ModelJson = zhihuModel): ModelJson {
+  if (!isPublicDemo()) return model;
+  // Explicit injection is used by local tests; public requests use only this
+  // DeepSeek transport and can never fall through to the Zhihu model.
+  if (model !== zhihuModel) return model;
+  if (!process.env.DEEPSEEK_API_KEY?.trim()) return scriptedDemoRoundtableModel;
+  return async (prompt, payload) => {
+    const result = await deepseekJson({
+      feature: "READING",
+      instructions: demoRoundtableInstructions(prompt),
+      input: payload,
+      maxTokens: 6000,
+      timeoutMs: 60000,
+    });
+    try {
+      return JSON.parse(result);
+    } catch {
+      throw new AppError("INVALID_RESPONSE", "圆桌生成未返回规定格式，请重试。", 502);
+    }
+  };
+}
+
 const questionSchema = z.string().trim().min(5).max(200);
 export async function startRoundtable(
   questionInput: string,
@@ -146,6 +183,23 @@ export async function startRoundtable(
   model: ModelJson = zhihuModel,
 ): Promise<Roundtable> {
   const question = questionSchema.parse(questionInput);
+  if (isPublicDemo()) {
+    const sources = demoRoundtableSources(question);
+    onProgress?.("正在载入项目原创示例资料，未检索知乎", sources);
+    onProgress?.(process.env.DEEPSEEK_API_KEY?.trim()
+      ? "DeepSeek 正在基于原创示例组织圆桌"
+      : "正在载入本地演示脚本（未配置 DeepSeek）", sources);
+    const round = await createRoundtable(
+      `round-${randomUUID()}`, question, sources, currentModel(model),
+      process.env.DEEPSEEK_API_KEY?.trim()
+        ? process.env.DEEPSEEK_MODEL?.trim() || "deepseek-flash"
+        : "local-demo-script",
+    );
+    labelDemoRoundtable(round);
+    ensureTable();
+    save(round, token);
+    return round;
+  }
   onProgress?.("正在检索知乎上的真实讨论");
   // Two queries give the roster enough distinct viewpoints; failures here are
   // surfaced, never filled with invented material.
@@ -192,6 +246,7 @@ export function listRoundtables(token: string): RoundtableSummary[] {
     .all(ownerHash(token), Date.now()) as { data: string }[];
   return rows
     .map((row) => JSON.parse(row.data) as Roundtable)
+    .filter((round) => round.provider === (isPublicDemo() ? "demo" : "live"))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, 10)
     .map((round) => ({
@@ -209,6 +264,7 @@ async function updateRound<T>(id: string, token: string, work: (round: Roundtabl
   return mutateRoundtable(db(), id, async (assertOwner) => {
     const round = load(id, token);
     const result = await work(round);
+    if (isPublicDemo()) labelDemoRoundtable(round);
     // Fence validation and commit must be atomic even across server processes.
     db().exec("BEGIN IMMEDIATE");
     try {
@@ -227,7 +283,7 @@ async function updateRound<T>(id: string, token: string, work: (round: Roundtabl
 export async function advance(id: string, token: string, expectedTurn?: number, model: ModelJson = zhihuModel) {
   return updateRound(id, token, async (round) => {
     if (expectedTurn !== undefined && expectedTurn !== round.scheduler.turn) return round;
-    await advanceRoundtable(round, round.sources, model);
+    await advanceRoundtable(round, round.sources, currentModel(model));
     return round;
   });
 }
@@ -236,21 +292,21 @@ const messageSchema = z.string().trim().min(1).max(300);
 export async function postMessage(id: string, token: string, contentInput: string, model: ModelJson = zhihuModel) {
   const content = messageSchema.parse(contentInput);
   return updateRound(id, token, async (round) => {
-    await joinUser(round, round.sources, model, content);
+    await joinUser(round, round.sources, currentModel(model), content);
     return round;
   });
 }
 
 export async function inviteGuest(id: string, token: string, guestId: string) {
   return updateRound(id, token, async (round) => {
-    await joinGuest(round, round.sources, zhihuModel, guestId);
+    await joinGuest(round, round.sources, currentModel(), guestId);
     return round;
   });
 }
 
 export async function completeEvidence(id: string, token: string, ids: string[]) {
   return updateRound(id, token, async (round) => {
-    const summaries = await summarizeEvidence(round, ids, zhihuModel);
+    const summaries = await summarizeEvidence(round, ids, currentModel());
     for (const message of round.messages) {
       if (summaries[message.id]) message.evidencePoints = summaries[message.id];
     }
@@ -260,7 +316,7 @@ export async function completeEvidence(id: string, token: string, ids: string[])
 
 export async function completeBriefs(id: string, token: string, ids: string[]) {
   return updateRound(id, token, async (round) => {
-    const summaries = await summarizeMessages(round, ids, zhihuModel);
+    const summaries = await summarizeMessages(round, ids, currentModel());
     for (const message of round.messages) {
       if (summaries[message.id]) message.summary = summaries[message.id];
     }

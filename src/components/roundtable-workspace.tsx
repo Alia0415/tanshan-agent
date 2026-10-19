@@ -1,4 +1,5 @@
 "use client";
+import { useDemoMode } from "./demo-mode";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Mountain } from "lucide-react";
@@ -27,6 +28,7 @@ async function api<T>(path: string, method = "GET", payload?: unknown) {
   return data as T;
 }
 export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?: string }) {
+  const demo = useDemoMode();
   const joiningGuest = useRef(false);
   const [stageSummaries, setStageSummaries] = useState<Record<string, string>>({});
   const receiveSummaries = useCallback((result: Record<string, string>) => {
@@ -56,7 +58,7 @@ export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?
   }, []);
   async function start() {
     if (!question.trim() || busy) return;
-    setBusy("正在检索并组建圆桌");
+    setBusy(demo.enabled ? "正在载入样例并组建圆桌" : "正在检索并组建圆桌");
     setPreviewSources([]);
     setError("");
     try {
@@ -203,7 +205,7 @@ export function RoundtableWorkspace({ initialQuestion = "" }: { initialQuestion?
                 </>
               )}
               <details>
-                <summary>查看 {round.sources.length} 条真实来源</summary>
+                <summary>查看 {round.sources.length} 条{round.provider === "demo" ? "原创样例" : "真实来源"}</summary>
                 {round.sources.map((source) => (
                   <p key={source.id}>
                     <a href={source.url} target="_blank" rel="noreferrer">

@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { isPublicDemo } from "./public-demo";
+import { generateDemoAnswer, selectDemoSources } from "./demo-answer";
 import type { z } from "zod";
 import { MAX_CLARIFICATION_ROUNDS, type Session } from "../domain/types";
 import {
@@ -32,7 +34,7 @@ import {
 } from "./providers";
 
 export async function createSession(question: string, token: string, planner: ClarificationPlanner = planClarification) {
-  const provider = process.env.WENSHAN_PROVIDER || "demo";
+  const provider = isPublicDemo() ? "demo" : process.env.WENSHAN_PROVIDER || "demo";
   if (!["demo", "live"].includes(provider))
     throw new AppError("CONFIGURATION", "服务配置暂不可用。", 503);
   const session: Session = {
@@ -299,13 +301,18 @@ export async function runAnswer(
   try {
     let session = isCurrent();
     if (!session) return;
+    if (isPublicDemo() && session.provider !== "demo")
+      throw new AppError("DEMO_SESSION", "当前为在线演示，请新建提问体验。", 409);
     let queries = buildQueries(session);
     let searchInfo;
     let conditionTags = fallbackConditionTags(session);
     let conditionSources: { label: string; history_index: number }[] = [];
     const warnings: string[] = [];
     let sources: Awaited<ReturnType<KnowledgeProvider["search"]>> = [];
-    if (session.provider === "live") {
+    if (isPublicDemo()) {
+      sources = selectDemoSources(session.original_question);
+      warnings.push(sources.length ? "本次仅匹配预置样例库，没有查询知乎。" : "预置样例库未覆盖这个问题，回答只提供一般分析步骤。");
+    } else if (session.provider === "live") {
       const result = await retrieve(session, provider, () => Boolean(isCurrent()));
       sources = result.sources;
       queries = result.queries;
@@ -321,7 +328,9 @@ export async function runAnswer(
     session.stage = "generating";
     saveSession(session);
     let draft;
-    if (session.provider === "demo" || !sources.length) {
+    if (isPublicDemo()) {
+      draft = await generateDemoAnswer(session, sources);
+    } else if (session.provider === "demo" || !sources.length) {
       draft = guidance(session, session.provider === "demo");
     } else {
       try {
@@ -352,6 +361,7 @@ export async function runAnswer(
       sources,
       queries,
       search_info: searchInfo,
+      ...(isPublicDemo() ? { demo_generation: process.env.DEEPSEEK_API_KEY?.trim() ? "ai" as const : "local" as const } : {}),
       evidence:
         session.provider === "demo"
           ? "demo"

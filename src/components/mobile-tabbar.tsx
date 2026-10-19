@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BookOpen, MessagesSquare, Mountain, UserRound } from "lucide-react";
+import { useDemoMode } from "./demo-mode";
 
 // 手机端底部导航：问答 / 阅读助手 / 观点圆桌 / 我的知乎。
 // 仅在窄屏显示（样式见 globals.css），当前页高亮，跳转逻辑一目了然。
@@ -25,10 +26,14 @@ const TABS = [
 ];
 
 export function MobileTabbar() {
+  const demo = useDemoMode();
   const pathname = usePathname() || "/";
+  const tabs = TABS.map(tab => demo.enabled && tab.href === "/me"
+    ? { ...tab, href: "/demo", label: "体验说明", match: (path: string) => path === "/demo" }
+    : tab);
   return (
     <nav className="mobile-tabbar" aria-label="主导航">
-      {TABS.map((tab) => {
+      {tabs.map((tab) => {
         const active = tab.match(pathname);
         return (
           <Link

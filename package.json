@@ -13,6 +13,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "test:smoke": "node scripts/smoke.mjs",
+    "test:public-demo": "node scripts/smoke-public-demo.mjs",
     "test:clarification": "tsx scripts/verify-clarification.ts",
     "test:search": "tsx scripts/verify-search.ts",
     "check": "npm run lint && npm run typecheck && npm test",
